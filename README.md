@@ -92,4 +92,4 @@ function parseListResponse(html) {
 }
 ```
 
-Chúc bạn thành công với dự án chế nguồn của bản thân! Đừng quên đóng góp các tài nguyên của mình cho nền tảng nha! 🌐
+Chúc bạn thành công với dự án chế nguồn của bản thân! Đừng quên đóng góp các tài nguyên của mình cho cộng đồng nha! 🌐
