@@ -33,23 +33,27 @@
             <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
                 <h2 class="text-xl font-semibold mb-3">3. Chạy Hàm Kiểm Tra</h2>
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="runFunction('getManifest')" class="btn-primary">getManifest()</button>
-                    <button onclick="runFunction('getHomeSections')" class="btn-primary">getHomeSections()</button>
+                    <button onclick="runFunction('getManifest')"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm transition">getManifest()</button>
+                    <button onclick="runFunction('getHomeSections')"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm transition">getHomeSections()</button>
                     <button onclick="runFunction('getPrimaryCategories')"
-                        class="btn-primary">getPrimaryCategories()</button>
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm transition">getPrimaryCategories()</button>
 
-                    <button onclick="runFunction('getUrlList')" class="btn-secondary">getUrlList(slug)</button>
+                    <button onclick="runFunction('getUrlList')"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded text-sm transition">getUrlList(slug)</button>
                     <button onclick="runFunction('parseListResponse')"
-                        class="btn-success">parseListResponse(html)</button>
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition">parseListResponse(html)</button>
 
-                    <button onclick="runFunction('getUrlDetail')" class="btn-secondary">getUrlDetail(slug)</button>
+                    <button onclick="runFunction('getUrlDetail')"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded text-sm transition">getUrlDetail(slug)</button>
                     <button onclick="runFunction('parseMovieDetail')"
-                        class="btn-success">parseMovieDetail(html)</button>
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition">parseMovieDetail(html)</button>
 
                     <button onclick="runFunction('parseDetailResponse')"
-                        class="btn-success">parseDetailResponse(html)</button>
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition">parseDetailResponse(html)</button>
                     <button onclick="runFunction('parseSearchResponse')"
-                        class="btn-success">parseSearchResponse(html)</button>
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition">parseSearchResponse(html)</button>
                 </div>
             </div>
         </div>
@@ -63,20 +67,6 @@
                 class="w-full flex-1 bg-gray-900 text-green-400 p-3 rounded border border-gray-600 focus:outline-none font-mono text-sm whitespace-pre"></textarea>
         </div>
     </div>
-
-    <style>
-        .btn-primary {
-            @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm transition;
-        }
-
-        .btn-secondary {
-            @apply bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded text-sm transition;
-        }
-
-        .btn-success {
-            @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition;
-        }
-    </style>
 
     <script>
         // Load JS file globally

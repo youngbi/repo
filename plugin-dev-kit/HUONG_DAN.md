@@ -14,7 +14,7 @@ Cách thức App lấy dữ liệu như sau:
 
 ### Làm Cách Nào Để Test Code (Debug) Ở Local?
 
-Bạn không thể `console.log()` trực tiếp vào App trên Điện thoại hay Tivi! Vậy nên hãy làm theo 3 bước này:
+Vì ứng dụng chạy trên Điện thoại và Tivi nên bạn không thể dễ dàng bật F12 để `console.log()` như trên Web. Do đó, hãy làm theo 3 bước giả lập cực kỳ đơn giản này:
 
 1. **Chuẩn Bị:** Mở file `plugin_template.js` -> Coppy đổi tên thành `<ten_web>_plugin.js`. 
 2. **Môi Trường Tester:** Bật file **`tester.html`** (nằm trong thư mục này) bằng trình duyệt Chrome.
@@ -126,6 +126,12 @@ Rất nhiều trang phim giấu m3u8 và chỉ cung cấp link Iframe của Serv
 }
 ```
 *Lưu ý: Link Iframe sẽ được WebView chạy ngầm, do đó App sẽ tự bóc mẽ và chiếu nội dung bên trong lên Player chuẩn! Một ví dụ về việc cào link Iframe/Embed có trong source của `sextop1_plugin.js`.*
+
+**⚠️ Trường Hợp Tái Tạo Lại Link `m3u8` Từ Đoạn Đóng Gói (Xếp hình UUID)**
+Nhiều trang bảo mật (như MissAV) giấu link m3u8 qua một biến `Blob` hoặc một thẻ `data-source` chứa mã số UUID (ví dụ: `8029b9cd-99b3-4f9e-a0e4-9d554a9c6b81`). 
+Khi bạn mở Network Tab kiểm tra thì thấy thực chất trình duyệt nó ghép mã UUID kia vào một Hosting CDN riêng để ra link `m3u8` cuối cùng: `https://surrit.com/{UUID}/playlist.m3u8`.
+
+Trong trường hợp này, bạn chỉ cần dùng Regex quét dính cái UUID đó, rồi tự nối chuỗi lại để ép Player chạy con link gốc! Bạn có thể xem ví dụ siêu kinh điển này ở dòng `616. // 4. Stream URL Logic` trong file `missav_plugin.js` của Repo.
 
 *Một ví dụ về bắt m3u8 thuần túy rất dễ để bám theo là file `ophim_plugin.js` trong Repo.*
 
