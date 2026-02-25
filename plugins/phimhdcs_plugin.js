@@ -424,14 +424,20 @@ function parseDetailResponse(htmlContent) {
     try {
         var decodeBase64 = function (str) {
             try {
-                if (typeof atob === 'function') return atob(str);
-                var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-                var output = '';
-                str = String(str).replace(/=+$/, '');
-                for (var bc = 0, bs, buffer, idx = 0; buffer = str.charAt(idx++); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0) {
-                    buffer = chars.indexOf(buffer);
+                var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+                var result = '';
+                str = String(str).replace(/[^A-Za-z0-9+\/]/g, '');
+                var len = str.length;
+                for (var i = 0; i < len; i += 4) {
+                    var a = lookup.indexOf(str.charAt(i));
+                    var b = i + 1 < len ? lookup.indexOf(str.charAt(i + 1)) : 0;
+                    var c = i + 2 < len ? lookup.indexOf(str.charAt(i + 2)) : -1;
+                    var d = i + 3 < len ? lookup.indexOf(str.charAt(i + 3)) : -1;
+                    result += String.fromCharCode((a << 2) | (b >> 4));
+                    if (c !== -1) result += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+                    if (d !== -1) result += String.fromCharCode(((c & 3) << 6) | d);
                 }
-                return output;
+                return result;
             } catch (e) { return null; }
         };
 
