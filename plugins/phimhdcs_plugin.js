@@ -538,6 +538,8 @@ function parseDetailResponse(htmlContent) {
             }
         }
 
+        // Fallback: return the episode page URL itself — WebView will load the full page
+        // and the page's own JS will render the embed player in #player div
         return "{}";
     } catch (error) { return "{}"; }
 }
