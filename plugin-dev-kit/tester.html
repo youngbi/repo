@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Developer Tester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6 font-sans">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left Panel: Input & Plugin Load -->
+        <div class="space-y-6">
+            <h1 class="text-2xl font-bold border-b border-gray-700 pb-2">Plugin Dev-Kit 🚀</h1>
+
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-3">1. Nạp file JS Plugin</h2>
+                <input type="file" id="pluginFile" accept=".js"
+                    class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 mb-2" />
+                <p id="pluginStatus" class="text-sm text-red-400">Chưa nạp plugin nào.</p>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-3">2. HTML Source / Tham số</h2>
+                <p class="text-xs text-gray-400 mb-2">Dán mã nguồn HTML (chọn "Thêm vào -> View Page Source" từ trang
+                    web phim) hoặc nhập Slug vào đây:</p>
+                <textarea id="inputData" rows="10"
+                    class="w-full bg-gray-900 text-gray-200 p-3 rounded border border-gray-600 focus:outline-none focus:border-blue-500 font-mono text-sm"
+                    placeholder="<html>...</html> hoặc slug..."></textarea>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-3">3. Chạy Hàm Kiểm Tra</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="runFunction('getManifest')" class="btn-primary">getManifest()</button>
+                    <button onclick="runFunction('getHomeSections')" class="btn-primary">getHomeSections()</button>
+                    <button onclick="runFunction('getPrimaryCategories')"
+                        class="btn-primary">getPrimaryCategories()</button>
+
+                    <button onclick="runFunction('getUrlList')" class="btn-secondary">getUrlList(slug)</button>
+                    <button onclick="runFunction('parseListResponse')"
+                        class="btn-success">parseListResponse(html)</button>
+
+                    <button onclick="runFunction('getUrlDetail')" class="btn-secondary">getUrlDetail(slug)</button>
+                    <button onclick="runFunction('parseMovieDetail')"
+                        class="btn-success">parseMovieDetail(html)</button>
+
+                    <button onclick="runFunction('parseDetailResponse')"
+                        class="btn-success">parseDetailResponse(html)</button>
+                    <button onclick="runFunction('parseSearchResponse')"
+                        class="btn-success">parseSearchResponse(html)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Output Format -->
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col h-full">
+            <h2 class="text-xl font-semibold mb-3">4. Kết Quả (Output) 🖥️</h2>
+            <p class="text-xs text-gray-400 mb-2">Nếu kết quả không đúng chuẩn JSON App cần, App sẽ bị lỗi tải dữ liệu.
+            </p>
+            <textarea id="outputData" readonly
+                class="w-full flex-1 bg-gray-900 text-green-400 p-3 rounded border border-gray-600 focus:outline-none font-mono text-sm whitespace-pre"></textarea>
+        </div>
+    </div>
+
+    <style>
+        .btn-primary {
+            @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm transition;
+        }
+
+        .btn-secondary {
+            @apply bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded text-sm transition;
+        }
+
+        .btn-success {
+            @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition;
+        }
+    </style>
+
+    <script>
+        // Load JS file globally
+        document.getElementById('pluginFile').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    // Xóa các hàm cũ
+                    ['getManifest', 'parseListResponse', 'parseMovieDetail', 'parseDetailResponse'].forEach(f => window[f] = undefined);
+
+                    // Nạp JS vào phạm vi toàn cục
+                    const script = document.createElement('script');
+                    script.textContent = e.target.result;
+                    document.body.appendChild(script);
+
+                    document.getElementById('pluginStatus').textContent = `✅ Đã nạp thành công: ${file.name}`;
+                    document.getElementById('pluginStatus').classList.replace('text-red-400', 'text-green-400');
+                } catch (err) {
+                    document.getElementById('pluginStatus').textContent = `❌ Lỗi khi nạp: ${err.message}`;
+                    document.getElementById('pluginStatus').classList.replace('text-green-400', 'text-red-400');
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Hàm chạy plugin
+        function runFunction(funcName) {
+            const outBox = document.getElementById('outputData');
+            outBox.value = "";
+            outBox.classList.remove('text-red-400');
+            outBox.classList.add('text-green-400');
+
+            if (typeof window[funcName] !== 'function') {
+                outBox.classList.replace('text-green-400', 'text-red-400');
+                outBox.value = `❌ Lỗi: Hàm ${funcName}() chưa được định nghĩa trong file Plugin của bạn!`;
+                return;
+            }
+
+            const inputArgs = document.getElementById('inputData').value;
+
+            try {
+                let result;
+                // Nếu là các hàm parse (truyền tham số html) hoặc url (truyền slug)
+                if (funcName.startsWith('parse') || funcName.startsWith('getUrlList') || funcName.startsWith('getUrlDetail')) {
+                    if (!inputArgs && funcName.startsWith('parse')) {
+                        console.warn("Chưa nhập HTML source, hàm parse có thể sẽ lỗi hoặc thiếu dữ liệu.");
+                    }
+                    result = window[funcName](inputArgs, "{}");
+                } else if (funcName.startsWith('getUrlSearch')) {
+                    result = window[funcName](inputArgs || "batman", "{}");
+                } else {
+                    // Hàm cấu hình ko tham số: getManifest, vv.
+                    result = window[funcName]();
+                }
+
+                // Format JSON output đẹp cho dễ nhìn
+                try {
+                    outBox.value = JSON.stringify(JSON.parse(result), null, 4);
+                } catch (e) {
+                    // Nếu ko phải JSON thì in nguyên bản (các hàm getUrl trả String)
+                    outBox.value = result;
+                }
+            } catch (err) {
+                outBox.classList.replace('text-green-400', 'text-red-400');
+                outBox.value = `❌ LỖI THỰC THI (Exception):\n\n${err.stack || err.message}`;
+            }
+        }
+    </script>
+</body>
+
+</html>
