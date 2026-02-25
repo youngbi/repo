@@ -503,8 +503,11 @@ function parseDetailResponse(htmlContent) {
                             if (chunks && Array.isArray(chunks)) {
                                 console.log('PHIMHDCS_DEBUG Step2: chunks count=' + chunks.length + ', first=' + (chunks[0] || '').substring(0, 50));
                                 var revBase64 = chunks.join('');
-                                console.log('PHIMHDCS_DEBUG Step2: revBase64 len=' + revBase64.length + ', first50=' + revBase64.substring(0, 50));
+                                var saltMatch = /(?:const|let|var)\s+_0xS\s*=\s*["']([^"']+)["']/.exec(htmlContent);
+                                var saltString = saltMatch ? saltMatch[1] : "";
+                                console.log('PHIMHDCS_DEBUG Step2: revBase64 len=' + revBase64.length + ', salt=' + saltString);
                                 var base64 = revBase64.split('').reverse().join('');
+                                if (saltString) base64 = base64.replace(saltString, '');
                                 console.log('PHIMHDCS_DEBUG Step2: base64 first50=' + base64.substring(0, 50));
                                 var playerUrl = decodeBase64(base64);
                                 console.log('PHIMHDCS_DEBUG Step2: decoded=' + playerUrl);
@@ -527,8 +530,11 @@ function parseDetailResponse(htmlContent) {
                     if (chunks && Array.isArray(chunks)) {
                         console.log('PHIMHDCS_DEBUG Step3: chunks count=' + chunks.length + ', first=' + (chunks[0] || '').substring(0, 50));
                         var revBase64 = chunks.join('');
-                        console.log('PHIMHDCS_DEBUG Step3: revBase64 len=' + revBase64.length + ', first50=' + revBase64.substring(0, 50));
+                        var saltMatch = /(?:const|let|var)\s+_0xS\s*=\s*["']([^"']+)["']/.exec(htmlContent);
+                        var saltString = saltMatch ? saltMatch[1] : "";
+                        console.log('PHIMHDCS_DEBUG Step3: revBase64 len=' + revBase64.length + ', salt=' + saltString);
                         var base64 = revBase64.split('').reverse().join('');
+                        if (saltString) base64 = base64.replace(saltString, '');
                         console.log('PHIMHDCS_DEBUG Step3: base64 first50=' + base64.substring(0, 50));
                         var playerUrl = decodeBase64(base64);
                         console.log('PHIMHDCS_DEBUG Step3: decoded=' + playerUrl);
