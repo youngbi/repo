@@ -464,7 +464,7 @@ function parseDetailResponse(htmlContent) {
         ];
         for (var i = 0; i < epPatterns.length; i++) {
             var epMatch = epPatterns[i].exec(htmlContent);
-            if (epMatch) { currentEpId = epMatch[1]; break; }
+            if (epMatch) { currentEpId = epMatch[1]; console.log('PHIMHDCS_DEBUG Step1: epId=' + currentEpId + ' pattern=' + i); break; }
         }
 
         // Fallback: extract data-id from active streaming-server button
@@ -501,9 +501,13 @@ function parseDetailResponse(htmlContent) {
                             var serverLinksChunks = JSON.parse(jsonStr);
                             var chunks = serverLinksChunks[currentEpId];
                             if (chunks && Array.isArray(chunks)) {
+                                console.log('PHIMHDCS_DEBUG Step2: chunks count=' + chunks.length + ', first=' + (chunks[0] || '').substring(0, 50));
                                 var revBase64 = chunks.join('');
+                                console.log('PHIMHDCS_DEBUG Step2: revBase64 len=' + revBase64.length + ', first50=' + revBase64.substring(0, 50));
                                 var base64 = revBase64.split('').reverse().join('');
+                                console.log('PHIMHDCS_DEBUG Step2: base64 first50=' + base64.substring(0, 50));
                                 var playerUrl = decodeBase64(base64);
+                                console.log('PHIMHDCS_DEBUG Step2: decoded=' + playerUrl);
                                 if (playerUrl && playerUrl.indexOf('http') === 0) {
                                     return makeResult(playerUrl);
                                 }
@@ -521,9 +525,13 @@ function parseDetailResponse(htmlContent) {
                     var arrStr = '[' + keyMatch[1] + ']';
                     var chunks = JSON.parse(arrStr);
                     if (chunks && Array.isArray(chunks)) {
+                        console.log('PHIMHDCS_DEBUG Step3: chunks count=' + chunks.length + ', first=' + (chunks[0] || '').substring(0, 50));
                         var revBase64 = chunks.join('');
+                        console.log('PHIMHDCS_DEBUG Step3: revBase64 len=' + revBase64.length + ', first50=' + revBase64.substring(0, 50));
                         var base64 = revBase64.split('').reverse().join('');
+                        console.log('PHIMHDCS_DEBUG Step3: base64 first50=' + base64.substring(0, 50));
                         var playerUrl = decodeBase64(base64);
+                        console.log('PHIMHDCS_DEBUG Step3: decoded=' + playerUrl);
                         if (playerUrl && playerUrl.indexOf('http') === 0) {
                             return makeResult(playerUrl);
                         }
