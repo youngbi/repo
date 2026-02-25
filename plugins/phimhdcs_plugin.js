@@ -422,60 +422,122 @@ function parseMovieDetail(htmlContent) {
 
 function parseDetailResponse(htmlContent) {
     try {
-        var epMatch = /const\s+episode\s*=\s*'(\d+)';/i.exec(htmlContent);
-        var currentEpId = epMatch ? epMatch[1] : null;
-        var chunksMatch = /const\s+serverLinksChunks\s*=\s*({[\s\S]*?});/i.exec(htmlContent);
-
-        if (chunksMatch && currentEpId) {
+        var decodeBase64 = function (str) {
             try {
-                var serverLinksChunks = JSON.parse(chunksMatch[1]);
-                var chunks = serverLinksChunks[currentEpId];
-                if (chunks && Array.isArray(chunks)) {
-                    var revBase64 = chunks.join('');
-                    var base64 = revBase64.split('').reverse().join('');
-                    var decodeBase64 = function (str) {
-                        try {
-                            if (typeof atob === 'function') return atob(str);
-                            var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-                            var output = '';
-                            str = String(str).replace(/=+$/, '');
-                            for (var bc = 0, bs, buffer, idx = 0; buffer = str.charAt(idx++); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0) {
-                                buffer = chars.indexOf(buffer);
-                            }
-                            return output;
-                        } catch (e) { return null; }
-                    };
-                    var playerUrl = decodeBase64(base64);
-                    if (playerUrl && playerUrl.indexOf('http') === 0) {
-                        return JSON.stringify({
-                            url: playerUrl,
-                            headers: {
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                                "Referer": "https://phimhdcs.com/"
-                            },
-                            subtitles: []
-                        });
-                    }
+                if (typeof atob === 'function') return atob(str);
+                var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+                var output = '';
+                str = String(str).replace(/=+$/, '');
+                for (var bc = 0, bs, buffer, idx = 0; buffer = str.charAt(idx++); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0) {
+                    buffer = chars.indexOf(buffer);
                 }
-            } catch (e) { }
+                return output;
+            } catch (e) { return null; }
+        };
+
+        var makeResult = function (playerUrl) {
+            return JSON.stringify({
+                url: playerUrl,
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Referer": "https://phimhdcs.com/"
+                },
+                subtitles: []
+            });
+        };
+
+        // --- Step 1: Extract episode ID (flexible: var/let/const, episode/episode_id, quoted or not) ---
+        var currentEpId = null;
+        var epPatterns = [
+            /(?:var|let|const)\s+episode\s*=\s*'(\d+)'/i,
+            /(?:var|let|const)\s+episode\s*=\s*"(\d+)"/i,
+            /(?:var|let|const)\s+episode\s*=\s*(\d+)\s*;/i,
+            /(?:var|let|const)\s+episode_id\s*=\s*'(\d+)'/i,
+            /(?:var|let|const)\s+episode_id\s*=\s*"(\d+)"/i,
+            /(?:var|let|const)\s+episode_id\s*=\s*(\d+)\s*;/i
+        ];
+        for (var i = 0; i < epPatterns.length; i++) {
+            var epMatch = epPatterns[i].exec(htmlContent);
+            if (epMatch) { currentEpId = epMatch[1]; break; }
         }
 
-        var serverMatch = /<a\s+[^>]*class="[^"]*active[^"]*"[^>]*data-link="([^"]+)"/i.exec(htmlContent);
-        if (!serverMatch) serverMatch = /<a\s+[^>]*data-link="([^"]+)"/i.exec(htmlContent);
+        // Fallback: extract data-id from active streaming-server button
+        if (!currentEpId) {
+            var activeMatch = /<a[^>]+class="[^"]*streaming-server[^"]*active[^"]*"[^>]*data-id="(\d+)"/i.exec(htmlContent);
+            if (!activeMatch) activeMatch = /<a[^>]+data-id="(\d+)"[^>]*class="[^"]*streaming-server[^"]*active[^"]*"/i.exec(htmlContent);
+            if (activeMatch) currentEpId = activeMatch[1];
+        }
+
+        // --- Step 2: Try serverLinksChunks (flexible: var/let/const) ---
+        if (currentEpId) {
+            var chunksPatterns = [
+                /(?:var|let|const)\s+serverLinksChunks\s*=\s*(\{[\s\S]*?\})\s*;/i,
+                /serverLinksChunks\s*=\s*(\{[\s\S]*?\})\s*;/i
+            ];
+
+            for (var ci = 0; ci < chunksPatterns.length; ci++) {
+                var chunksMatch = chunksPatterns[ci].exec(htmlContent);
+                if (chunksMatch) {
+                    try {
+                        // Try balanced brace extraction for proper JSON
+                        var startIdx = chunksMatch.index + chunksMatch[0].indexOf('{');
+                        var braceCount = 0;
+                        var jsonEnd = -1;
+                        for (var j = startIdx; j < htmlContent.length && j < startIdx + 50000; j++) {
+                            if (htmlContent[j] === '{') braceCount++;
+                            else if (htmlContent[j] === '}') {
+                                braceCount--;
+                                if (braceCount === 0) { jsonEnd = j + 1; break; }
+                            }
+                        }
+                        if (jsonEnd > 0) {
+                            var jsonStr = htmlContent.substring(startIdx, jsonEnd);
+                            var serverLinksChunks = JSON.parse(jsonStr);
+                            var chunks = serverLinksChunks[currentEpId];
+                            if (chunks && Array.isArray(chunks)) {
+                                var revBase64 = chunks.join('');
+                                var base64 = revBase64.split('').reverse().join('');
+                                var playerUrl = decodeBase64(base64);
+                                if (playerUrl && playerUrl.indexOf('http') === 0) {
+                                    return makeResult(playerUrl);
+                                }
+                            }
+                        }
+                    } catch (e) { }
+                }
+            }
+
+            // --- Step 3: Search for data-id as a JSON key anywhere in page ---
+            var keyPattern = new RegExp('"' + currentEpId + '"\\s*:\\s*\\[([^\\]]+)\\]');
+            var keyMatch = keyPattern.exec(htmlContent);
+            if (keyMatch) {
+                try {
+                    var arrStr = '[' + keyMatch[1] + ']';
+                    var chunks = JSON.parse(arrStr);
+                    if (chunks && Array.isArray(chunks)) {
+                        var revBase64 = chunks.join('');
+                        var base64 = revBase64.split('').reverse().join('');
+                        var playerUrl = decodeBase64(base64);
+                        if (playerUrl && playerUrl.indexOf('http') === 0) {
+                            return makeResult(playerUrl);
+                        }
+                    }
+                } catch (e) { }
+            }
+        }
+
+        // --- Step 4: Fallback to data-link attribute (if exists in HTML) ---
+        var serverMatch = /<a[^>]+class="[^"]*active[^"]*"[^>]*data-link="([^"]+)"/i.exec(htmlContent);
+        if (!serverMatch) serverMatch = /<a[^>]+data-link="([^"]+)"[^>]*class="[^"]*active[^"]*"/i.exec(htmlContent);
+        if (!serverMatch) serverMatch = /<a[^>]*data-link="([^"]+)"/i.exec(htmlContent);
 
         if (serverMatch) {
             var playerUrl = serverMatch[1].trim();
-            if (playerUrl && playerUrl.indexOf('${link}') === -1) {
-                return JSON.stringify({
-                    url: playerUrl,
-                    headers: {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        "Referer": "https://phimhdcs.com/"
-                    },
-                    subtitles: []
-                });
+            if (playerUrl && playerUrl.indexOf('${link}') === -1 && playerUrl.indexOf('http') === 0) {
+                return makeResult(playerUrl);
             }
         }
+
         return "{}";
     } catch (error) { return "{}"; }
 }
