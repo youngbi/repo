@@ -14,7 +14,7 @@ Cách thức App lấy dữ liệu như sau:
 
 ### Làm Cách Nào Để Test Code (Debug) Ở Local?
 
-Bạn không thể console.log() vào Tivi! Vậy nên hãy làm theo 3 bước này:
+Bạn không thể `console.log()` trực tiếp vào App trên Điện thoại hay Tivi! Vậy nên hãy làm theo 3 bước này:
 
 1. **Chuẩn Bị:** Mở file `plugin_template.js` -> Coppy đổi tên thành `<ten_web>_plugin.js`. 
 2. **Môi Trường Tester:** Bật file **`tester.html`** (nằm trong thư mục này) bằng trình duyệt Chrome.
@@ -111,6 +111,22 @@ Màn hốt hụi chót! Gửi Data từ thẻ DOM mà bạn mổ xẻ ra để V
 }
 ```
 
-*Một ví dụ rất rất dễ để bám theo là hãy đọc Source mở của file `ophim_plugin.js` trong Repo.*
+}
+```
+
+**⚠️ Trường Hợp KHÔNG Có Link `m3u8` Trực Tiếp (Dùng Link Embed/Iframe)**
+Rất nhiều trang phim giấu m3u8 và chỉ cung cấp link Iframe của Server Player (ví dụ: doodstream, hydrax...). Lúc này, App của chúng ta ĐÃ hỗ trợ tự động Parse và Play bằng WebView. Nhiệm vụ của bạn chỉ là truyền link Embed đó vào biến `url`:
+```json
+{
+  "url": "https://vidplayer.site/embed/avenger123",
+  "headers": {
+    "Referer": "https://domain.com"
+  },
+  "subtitles": []
+}
+```
+*Lưu ý: Link Iframe sẽ được WebView chạy ngầm, do đó App sẽ tự bóc mẽ và chiếu nội dung bên trong lên Player chuẩn! Một ví dụ về việc cào link Iframe/Embed có trong source của `sextop1_plugin.js`.*
+
+*Một ví dụ về bắt m3u8 thuần túy rất dễ để bám theo là file `ophim_plugin.js` trong Repo.*
 
 > **Mẹo vặt JS Sandbox:** App sử dụng Google QuickJS Engine V8 siêu nhanh. Nên bạn đừng dùng các hàm DOM Web Browser như `document.querySelector` hoặc `window...`. Hãy thuần thục Regex `match() / exec()` và Parsing chuỗi `substr(), replace()` là trùm cuối!
