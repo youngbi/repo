@@ -1,6 +1,6 @@
 {
     "latestVersionCode": 21,
     "latestVersionName": "1.2.1",
-    "releaseNotes": "- Bản chính thức, cần xóa bản cũ đi cài lại\n- Bỏ Gson, tăng tốc App (Kotlinx Serialization)\n- Khắc phục lỗi Google Login (Xác thực SHA-1)\n- Giải phóng và tối ưu RAM cực mạnh\n- Thêm logic tự bỏ qua quảng cáo,
+    "releaseNotes": "- Bản chính thức, cần xóa bản cũ đi cài lại\n- Bỏ Gson, tăng tốc App (Kotlinx Serialization)\n- Khắc phục lỗi Google Login (Xác thực SHA-1)\n- Giải phóng và tối ưu RAM cực mạnh\n- Thêm logic tự bỏ qua quảng cáo",
     "downloadUrl": "https://raw.githubusercontent.com/youngbi/repo/main/app-release.apk"
 }
