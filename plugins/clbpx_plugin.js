@@ -283,13 +283,6 @@ function parseDetailResponse(htmlResponse, fallbackUrl) {
     try {
         var streamUrl = fallbackUrl || "";
 
-        // Extract v= parameter from clbpx.html?v=XXX and construct direct abysscdn embed URL
-        // This skips the iframe hop: clbpx.html → iframe → abysscdn.com
-        var vMatch = streamUrl.match(/[?&]v=([a-zA-Z0-9_-]+)/);
-        if (vMatch && vMatch[1]) {
-            streamUrl = "https://abysscdn.com/?v=" + vMatch[1];
-        }
-
         return JSON.stringify({
             url: streamUrl,
             headers: {
