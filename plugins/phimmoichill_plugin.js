@@ -83,7 +83,7 @@ function getUrlSearch(keyword, filtersJson) {
 
 function getUrlDetail(slug) {
     if (slug.indexOf("http") === 0) return slug;
-    return "https://phimmoichill.my/phim/" + slug + ".html";
+    return "https://phimmoichill.my/info/" + slug + ".html";
 }
 
 function getUrlCategories() { return "https://phimmoichill.my/"; }
