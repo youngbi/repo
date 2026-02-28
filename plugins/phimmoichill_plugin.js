@@ -21,8 +21,8 @@ function getPrimaryCategories() {
         { name: 'Phim Mới', slug: 'phim-moi' },
         { name: 'Phim Lẻ', slug: 'phim-le' },
         { name: 'Phim Bộ', slug: 'phim-bo' },
-        { name: 'Hành Động', slug: 'the-loai/phim-hanh-dong' },
-        { name: 'Chiếu Rạp', slug: 'the-loai/phim-chieu-rap' }
+        { name: 'Hành Động', slug: 'genre/phim-hanh-dong' },
+        { name: 'Chiếu Rạp', slug: 'genre/phim-chieu-rap' }
     ]);
 }
 
@@ -31,8 +31,8 @@ function getHomeSections() {
         { slug: 'phim-moi', title: 'Phim Mới Cập Nhật', type: 'Horizontal', path: '' },
         { slug: 'phim-le', title: 'Phim Lẻ', type: 'Horizontal', path: '' },
         { slug: 'phim-bo', title: 'Phim Bộ', type: 'Horizontal', path: '' },
-        { slug: 'the-loai/phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: '' },
-        { slug: 'the-loai/phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: '' }
+        { slug: 'genre/phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: '' },
+        { slug: 'genre/phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: '' }
     ]);
 }
 
@@ -40,12 +40,12 @@ function getFilterConfig() {
     return JSON.stringify({
         sort: [],
         category: [
-            { name: "Hành Động", value: "the-loai/phim-hanh-dong" },
-            { name: "Võ Thuật", value: "the-loai/phim-vo-thuat" },
-            { name: "Tình Cảm", value: "the-loai/phim-tinh-cam" },
-            { name: "Hài Hước", value: "the-loai/phim-hai-huoc" },
-            { name: "Hoạt Hình", value: "the-loai/phim-hoat-hinh" },
-            { name: "Chiếu Rạp", value: "the-loai/phim-chieu-rap" }
+            { name: "Hành Động", value: "genre/phim-hanh-dong" },
+            { name: "Võ Thuật", value: "genre/phim-vo-thuat" },
+            { name: "Tình Cảm", value: "genre/phim-tinh-cam" },
+            { name: "Hài Hước", value: "genre/phim-hai-huoc" },
+            { name: "Hoạt Hình", value: "genre/phim-hoat-hinh" },
+            { name: "Chiếu Rạp", value: "genre/phim-chieu-rap" }
         ]
     });
 }
@@ -65,6 +65,10 @@ function getUrlList(slug, filtersJson) {
     }
 
     var url = "https://phimmoichill.my/list/" + baseSlug;
+    if (baseSlug.indexOf("genre") === 0 || baseSlug.indexOf("country") === 0) {
+        url = "https://phimmoichill.my/" + baseSlug;
+    }
+
     if (page > 1) {
         url += "/page-" + page;
     }
@@ -124,25 +128,32 @@ function parseListResponse(html) {
         var itemHtml = parts[i];
 
         // Lấy link và ID/Slug
-        var linkMatch = itemHtml.match(/href="([^"]*(?:\/phim\/|\/xem\/|info-)([^"\/]+)(?:\.html|))"/);
+        var linkMatch = itemHtml.match(/href="([^"]*(?:\/phim\/|\/xem\/|\/info\/)([^"\/]+)(?:\.html|))"/);
         if (!linkMatch) linkMatch = itemHtml.match(/href="([^"]+)"/);
 
         var fullUrl = linkMatch ? linkMatch[1] : "";
-        var slugMatch = fullUrl.match(/\/phim\/([^\/.]+)/) || fullUrl.match(/\/xem\/([^\/]+)-pm/);
+        var slugMatch = fullUrl.match(/\/phim\/([^\/.]+)/) || fullUrl.match(/\/xem\/([^\/]+)-pm/) || fullUrl.match(/\/info\/([^\/.]+)/);
         var slug = slugMatch ? slugMatch[1] : (linkMatch ? linkMatch[2] : "");
 
         if (slug) slug = slug.replace(".html", "").replace("info-", "");
 
         // Lấy tiêu đề 
-        var titleMatch = itemHtml.match(/title="([^"]+)"/);
-        var title = titleMatch ? titleMatch[1] : "";
+        var title = "";
+        var pMatch = itemHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (pMatch) title = pMatch[1].replace(/<[^>]*>/g, "").trim();
+
         if (!title) {
-            var h3Match = itemHtml.match(/<h3[^>]*>(?:<a[^>]*>)?([\s\S]*?)(?:<\/a>)?<\/h3>/);
-            if (h3Match) title = h3Match[1];
+            var h3Match = itemHtml.match(/<h3[^>]*>(?:<a[^>]*>)?([\s\S]*?)(?:<\/a>)?<\/h3>/i);
+            if (h3Match) title = h3Match[1].replace(/<[^>]*>/g, "").trim();
             else {
-                var pMatch = itemHtml.match(/<p[^>]*class="name"[^>]*>([\s\S]*?)<\/p>/);
-                if (pMatch) title = pMatch[1];
+                var pMatch2 = itemHtml.match(/<p[^>]*class="name"[^>]*>([\s\S]*?)<\/p>/i);
+                if (pMatch2) title = pMatch2[1].replace(/<[^>]*>/g, "").trim();
             }
+        }
+
+        if (!title && itemHtml.indexOf('title="') > -1) {
+            var maybeTitleMatch = itemHtml.match(/title="([^"]+)"/);
+            if (maybeTitleMatch) title = maybeTitleMatch[1];
         }
 
         // Lấy ảnh Thumbnail
