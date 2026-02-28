@@ -58,6 +58,20 @@
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/sextop1.webp"
         },
         {
+            "id": "phimmoichill",
+            "name": "PhimMoiChill",
+            "version": "1.0.0",
+            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimmoichill_plugin.js",
+            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimmoi.webp"
+        },
+        {
+            "id": "clbpx",
+            "name": "CLB Phim Xưa",
+            "version": "1.0.2",
+            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/clbpx_plugin.js",
+            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/clbpx.ico"
+        },
+        {
             "id": "otruyen",
             "name": "OTruyen",
             "version": "1.0.0",
@@ -77,13 +91,6 @@
             "version": "1.0.0",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/misskon_plugin.js",
             "iconUrl": "https://misskon.com/favicon.ico"
-        },
-        {
-            "id": "clbpx",
-            "name": "CLB Phim Xưa",
-            "version": "1.0.2",
-            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/clbpx_plugin.js",
-            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/clbpx.ico"
         }
     ]
 }
