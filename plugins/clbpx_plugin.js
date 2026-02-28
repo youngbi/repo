@@ -6,7 +6,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "clbpx",
         "name": "CLB Phim Xưa",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "baseUrl": "https://clbphimxua.com",
         "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/clbpx.ico",
         "isEnabled": true,
@@ -288,7 +288,7 @@ function parseDetailResponse(htmlResponse, fallbackUrl) {
             headers: {
                 "Referer": "https://clbphimxua.com/",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Custom-Js": "var clbplay = document.querySelector('.jw-display-icon-display, img[src*=\"play\"], .play-btn'); if(clbplay) { try { clbplay.click(); } catch(e){} }"
+                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){var b=document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn');if(b){try{b.click();b.style.display='none';clearInterval(clbInt);}catch(e){}}if(attempt++>20)clearInterval(clbInt);},500);"
             }
         });
     } catch (error) {
