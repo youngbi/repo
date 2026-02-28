@@ -287,7 +287,8 @@ function parseDetailResponse(htmlResponse, fallbackUrl) {
             url: streamUrl,
             headers: {
                 "Referer": "https://clbphimxua.com/",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Custom-Js": "var clbplay = document.querySelector('.jw-display-icon-display, img[src*=\"play\"], .play-btn'); if(clbplay) { try { clbplay.click(); } catch(e){} }"
             }
         });
     } catch (error) {
