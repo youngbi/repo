@@ -611,9 +611,34 @@ function parseDetailResponse(htmlContent, pageUrl) {
             }
         }
 
-        // Final fallback: return empty → PlayerViewModel will use WebView with episode page URL
-        return "{}";
-    } catch (error) { return "{}"; }
+        // --- Kiểm tra xem trên trang có iframe nào ko (giống phimmoichill) ---
+        var iframeMatch = htmlContent.match(/<iframe[^>]*src="([^"]+)"/);
+        if (iframeMatch) {
+            var urlIframe = iframeMatch[1];
+            if (urlIframe.indexOf("facebook") === -1 && urlIframe.indexOf("youtube") === -1 && urlIframe.indexOf("google") === -1) {
+                if (urlIframe.indexOf("//") === 0) {
+                    urlIframe = "https:" + urlIframe;
+                }
+                return makeResult(urlIframe);
+            }
+        }
+
+        // Final fallback: return fallback kèm headers (để WebView chặn quảng cáo)
+        var fullWebUrl = (fallbackUrl && fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimhdcs.com" + (fallbackUrl || ""));
+        return JSON.stringify({
+            url: fullWebUrl,
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://phimhdcs.com/",
+                // Add header để WebViewClient nhận diện đây là base request và allowed domain
+                "Allowed-Domains": "phimhdcs.com, googleapis.com",
+            },
+            subtitles: []
+        });
+    } catch (error) {
+        var fallbackCatchUrl = (fallbackUrl && fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimhdcs.com" + (fallbackUrl || ""));
+        return JSON.stringify({ url: fallbackCatchUrl, headers: {}, subtitles: [] });
+    }
 }
 
 function parseCategoriesResponse(htmlContent) {

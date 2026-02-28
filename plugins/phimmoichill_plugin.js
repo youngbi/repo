@@ -408,6 +408,10 @@ function parseDetailResponse(html, fallbackUrl) {
             var url = iframeMatch[1];
             // Bỏ qua các iframe rác như facebook, youtube trailer
             if (url.indexOf("facebook") === -1 && url.indexOf("youtube") === -1 && url.indexOf("google") === -1) {
+                // Nếu iframe là src dạng //domain.com thì thêm https:
+                if (url.indexOf("//") === 0) {
+                    url = "https:" + url;
+                }
                 return JSON.stringify({
                     url: url,
                     headers: {
@@ -419,26 +423,29 @@ function parseDetailResponse(html, fallbackUrl) {
             }
         }
 
-        // 2. Nếu trả về script hoặc data JSON (trong trường hợp app Android có interceptor xử lý AJAX request sau dấy)
-        // Với PhimMoiChill, khi vào trang /xem/... nó sẽ gọi chillsplayer.php.
-        // Nhưng nếu trả về chính URL '/xem/...' thì Kotlin App sẽ load URL đó bằng WebView => TVPlayerScreen
-        // Và xử lý autoplay tương tự Sextop1 thông qua Custom-Js.
+        // 2. Thử tìm script chứa link m3u8 hoặc nguồn embed (nếu có player trực tiếp)
+        var sourceMatch = html.match(/sources:\s*\[\s*{\s*file:\s*["']([^"']+)["']/i) ||
+            html.match(/source\s*src\s*=\s*["']([^"']+)["']/i);
+        if (sourceMatch) {
+            return JSON.stringify({
+                url: sourceMatch[1],
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://phimmoichill.my/"
+                },
+                subtitles: []
+            });
+        }
 
+        // 3. Fallback: URL của trang kèm header chặn quảng cáo // turbo
+        var fullWebUrl = (fallbackUrl && fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimmoichill.my" + (fallbackUrl || ""));
         return JSON.stringify({
-            url: (fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimmoichill.my" + fallbackUrl),
+            url: fullWebUrl,
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Referer": "https://phimmoichill.my/",
-                // Script tự động nhấn play và ẩn các thành phần thừa trên TV
-                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
-                    "try { " +
-                    "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"], .icon-play'); " +
-                    "if(b && b.offsetWidth > 0){ " +
-                    "   b.click(); b.style.display='none'; " +
-                    "} " +
-                    "} catch(e){} " +
-                    "if(attempt++ > 40) { clearInterval(clbInt); } " +
-                    "}, 500);"
+                // Add header để WebViewClient nhận diện đây là base request và allowed domain
+                "Allowed-Domains": "phimmoichill.my, googleapis.com",
             },
             subtitles: []
         });
