@@ -288,13 +288,33 @@ function parseDetailResponse(htmlResponse, fallbackUrl) {
             headers: {
                 "Referer": "https://clbphimxua.com/",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
-                    "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"]'); " +
-                    "if(b && b.offsetWidth > 0){ " +
-                    "   try{ b.click(); b.style.visibility='hidden'; b.style.opacity='0'; b.style.pointerEvents='none'; }catch(e){} " +
-                    "} " +
-                    "if(attempt++ > 40) clearInterval(clbInt); " +
-                    "}, 500);"
+                "Custom-Js": `(function(){
+                    var attempt=0; 
+                    var clbInt=setInterval(function(){ 
+                        var v = document.querySelector('video');
+                        if (v && v.paused) {
+                            // 1. Click common play buttons
+                            ['.vjs-big-play-button', '.jw-display-icon-container', '.play-btn', '.play-button'].forEach(function(s){
+                                var el = document.querySelector(s);
+                                if (el && el.offsetParent !== null) {
+                                    try { el.click(); } catch(e) {}
+                                }
+                            });
+                            
+                            // 2. Click center of the screen
+                            var centerEl = document.elementFromPoint(window.innerWidth/2, window.innerHeight/2);
+                            if (centerEl) {
+                                try { centerEl.click(); } catch(e) {}
+                            }
+                            
+                            // 3. Direct play attempt
+                            try { v.play(); } catch(e) {}
+                        }
+                        
+                        // Stop after 20 attempts (20 seconds) or when playing
+                        if(attempt++ > 20 || (v && !v.paused)) clearInterval(clbInt); 
+                    }, 1000);
+                })()`
             }
         });
     } catch (error) {
