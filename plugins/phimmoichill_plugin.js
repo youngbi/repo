@@ -28,11 +28,11 @@ function getPrimaryCategories() {
 
 function getHomeSections() {
     return JSON.stringify([
-        { slug: 'phim-moi', title: 'Phim Mới Cập Nhật', type: 'Horizontal', path: 'list' },
-        { slug: 'phim-le', title: 'Phim Lẻ', type: 'Horizontal', path: 'list' },
-        { slug: 'phim-bo', title: 'Phim Bộ', type: 'Horizontal', path: 'list' },
-        { slug: 'phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: 'genre' },
-        { slug: 'phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: 'genre' }
+        { slug: 'list/phim-moi', title: 'Phim Mới Cập Nhật', type: 'Horizontal' },
+        { slug: 'list/phim-le', title: 'Phim Lẻ', type: 'Horizontal' },
+        { slug: 'list/phim-bo', title: 'Phim Bộ', type: 'Horizontal' },
+        { slug: 'genre/phim-hanh-dong', title: 'Hành Động', type: 'Horizontal' },
+        { slug: 'genre/phim-tinh-cam', title: 'Tình Cảm', type: 'Grid' }
     ]);
 }
 
@@ -88,6 +88,12 @@ function getUrlSearch(keyword, filtersJson) {
 function getUrlDetail(slug) {
     if (!slug) return "https://phimmoichill.my/";
     if (slug.indexOf("http") === 0) return slug;
+
+    // Xử lý slug bị lỗi do app gộp (nếu có /xem/ hoặc /info/ bên trong)
+    if (slug.indexOf("/xem/") > -1 || slug.indexOf("/info/") > -1) {
+        return "https://phimmoichill.my" + (slug.indexOf("/") === 0 ? "" : "/") + slug;
+    }
+
     // PhimMoiChill dùng /info/ cho trang chi tiết
     return "https://phimmoichill.my/info/" + slug.replace(".html", "");
 }
@@ -270,15 +276,21 @@ function parseMovieDetail(html) {
         if (!titleMatch) titleMatch = html.match(/<h2[^>]*class="title[^"]*"[^>]*>([\s\S]*?)<\/h2>/);
         var title = titleMatch ? titleMatch[1].trim() : "";
 
-        // ID phim (Slug) để tránh refresh bị 404
+        // ID phim (Slug) - Cần cực kỳ cẩn thận với regex để không lấy nhầm tag html
         var id = "";
-        var idMatch = html.match(/<link rel="canonical" href="[^"]+\/phim\/([^"\/.]+)/) ||
-            html.match(/<meta property="og:url" content="[^"]+\/phim\/([^"\/.]+)/) ||
-            html.match(/\/phim\/([^\/.]+)\.html/);
+        var idMatch = html.match(/<link rel="canonical" href="[^"]+\/(?:phim|info)\/([^"\/?>\s]+)/) ||
+            html.match(/<meta property="og:url" content="[^"]+\/(?:phim|info)\/([^"\/?>\s]+)/);
         if (idMatch) id = idMatch[1];
+
         if (!id) {
-            var pathMatch = html.match(/\/phim\/([^\/.]+)\.html/) || html.match(/\/info\/([^\/.]+)/);
+            // Fallback từ các link trên trang, ưu tiên /info/ hoặc /phim/
+            var pathMatch = html.match(/\/(?:phim|info)\/([^"\/?>\s.]+)(?:\.html|)/);
             id = pathMatch ? pathMatch[1] : "";
+        }
+
+        // Final check để đảm bảo id không chứa ký tự lạ của HTML
+        if (id) {
+            id = id.split('"')[0].split("'")[0].split('>')[0].split(' ')[0];
         }
 
         // Mô tả
@@ -419,10 +431,12 @@ function parseDetailResponse(html, fallbackUrl) {
                 "Referer": "https://phimmoichill.my/",
                 // Script tự động nhấn play và ẩn các thành phần thừa trên TV
                 "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
+                    "try { " +
                     "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"], .icon-play'); " +
                     "if(b && b.offsetWidth > 0){ " +
-                    "   try{ b.click(); b.style.visibility='hidden'; b.style.opacity='0'; b.style.pointerEvents='none'; }catch(e){} " +
+                    "   b.click(); b.style.display='none'; " +
                     "} " +
+                    "} catch(e){} " +
                     "if(attempt++ > 40) { clearInterval(clbInt); } " +
                     "}, 500);"
             },
