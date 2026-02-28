@@ -139,7 +139,12 @@ function parseListResponse(html) {
         var slugMatch = fullUrl.match(/\/phim\/([^\/.]+)/) || fullUrl.match(/\/xem\/([^\/]+)-pm/) || fullUrl.match(/\/info\/([^\/.]+)/);
         var slug = slugMatch ? slugMatch[1] : (linkMatch ? linkMatch[2] : "");
 
-        if (slug) slug = slug.replace(".html", "").replace("info-", "");
+        if (slug) {
+            slug = slug.replace(".html", "")
+                .replace("info-", "")
+                .replace(/^info\//, "")
+                .replace(/^phim\//, "");
+        }
 
         // Lấy tiêu đề 
         var title = "";
@@ -263,6 +268,17 @@ function parseMovieDetail(html) {
         if (!titleMatch) titleMatch = html.match(/<h2[^>]*class="title[^"]*"[^>]*>([\s\S]*?)<\/h2>/);
         var title = titleMatch ? titleMatch[1].trim() : "";
 
+        // ID phim (Slug) để tránh refresh bị 404
+        var id = "";
+        var idMatch = html.match(/<link rel="canonical" href="[^"]+\/phim\/([^"\/.]+)/) ||
+            html.match(/<meta property="og:url" content="[^"]+\/phim\/([^"\/.]+)/) ||
+            html.match(/\/phim\/([^\/.]+)\.html/);
+        if (idMatch) id = idMatch[1];
+        if (!id) {
+            var pathMatch = html.match(/\/phim\/([^\/.]+)\.html/) || html.match(/\/info\/([^\/.]+)/);
+            id = pathMatch ? pathMatch[1] : "";
+        }
+
         // Mô tả
         var descMatch = html.match(/<div[^>]*class="[^"]*film-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
             html.match(/<div[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
@@ -347,7 +363,7 @@ function parseMovieDetail(html) {
         if (statusMatch) labels.push(PluginUtils.cleanText(statusMatch[1]));
 
         return JSON.stringify({
-            id: "",
+            id: id,
             title: PluginUtils.cleanText(title),
             posterUrl: thumb,
             backdropUrl: thumb,
@@ -401,8 +417,10 @@ function parseDetailResponse(html, fallbackUrl) {
                 // Script tự động nhấn play và ẩn các thành phần thừa trên TV
                 "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
                     "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"]'); " +
-                    "if(b && b.offsetWidth > 0){ try{ b.click(); b.style.display='none'; clearInterval(clbInt); } catch(e){} } " +
-                    "if(attempt++ > 30) clearInterval(clbInt); " +
+                    "if(b && b.offsetWidth > 0){ " +
+                    "   try{ b.click(); b.style.visibility='hidden'; b.style.opacity='0'; b.style.pointerEvents='none'; }catch(e){} " +
+                    "} " +
+                    "if(attempt++ > 30) { clearInterval(clbInt); } " +
                     "}, 500);"
             },
             subtitles: []
