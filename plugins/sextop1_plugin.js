@@ -6,7 +6,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "sextop1",
         "name": "Sextop1",
-        "version": "1.1.1",
+        "version": "1.1.2",
         "baseUrl": "https://sextop1.page",
         "iconUrl": "https://stpaulclinic.vn/vaapp/plugins/sextop1.webp",
         "isEnabled": true,
