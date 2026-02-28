@@ -23,25 +23,11 @@
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/nguonC.png"
         },
         {
-            "id": "phimhdcs",
-            "name": "PhimHDCS",
-            "version": "1.0.3",
-            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimhdcs_plugin.js",
-            "iconUrl": "https://phimhdcs.com/favicon.ico"
-        },
-        {
             "id": "hh3d",
             "name": "HH3D - Hoạt Hình 3D",
             "version": "1.0.1",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/hh3d_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/hh3d.ico"
-        },
-        {
-            "id": "phimmoichill",
-            "name": "PhimMoiChill",
-            "version": "1.0.0",
-            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimmoichill_plugin.js",
-            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimmoi.webp"
         },
         {
             "id": "clbpx",
