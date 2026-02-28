@@ -28,11 +28,11 @@ function getPrimaryCategories() {
 
 function getHomeSections() {
     return JSON.stringify([
-        { slug: 'phim-moi', title: 'Phim Mới Cập Nhật', type: 'Horizontal', path: '' },
-        { slug: 'phim-le', title: 'Phim Lẻ', type: 'Horizontal', path: '' },
-        { slug: 'phim-bo', title: 'Phim Bộ', type: 'Horizontal', path: '' },
-        { slug: 'genre/phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: '' },
-        { slug: 'genre/phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: '' }
+        { slug: 'phim-moi', title: 'Phim Mới Cập Nhật', type: 'Horizontal', path: 'list' },
+        { slug: 'phim-le', title: 'Phim Lẻ', type: 'Horizontal', path: 'list' },
+        { slug: 'phim-bo', title: 'Phim Bộ', type: 'Horizontal', path: 'list' },
+        { slug: 'phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: 'genre' },
+        { slug: 'phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: 'genre' }
     ]);
 }
 
@@ -58,15 +58,19 @@ function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var baseSlug = slug || 'phim-moi';
+    var path = filters.path || 'list';
 
     // Nếu filter có category thì dùng category, ghi đè slug
     if (filters.category) {
         baseSlug = filters.category;
     }
 
-    var url = "https://phimmoichill.my/list/" + baseSlug;
-    if (baseSlug.indexOf("genre") === 0 || baseSlug.indexOf("country") === 0) {
-        url = "https://phimmoichill.my/" + baseSlug;
+    // Nếu slug đã chứa prefix thì không cần thêm path
+    var url = "https://phimmoichill.my/";
+    if (baseSlug.indexOf('/') > -1) {
+        url += baseSlug;
+    } else {
+        url += path + "/" + baseSlug;
     }
 
     if (page > 1) {
