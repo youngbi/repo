@@ -288,13 +288,7 @@ function parseDetailResponse(htmlResponse, fallbackUrl) {
             headers: {
                 "Referer": "https://clbphimxua.com/",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
-                    "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"]'); " +
-                    "if(b && b.offsetWidth > 0){ " +
-                    "   try{ b.click(); b.style.visibility='hidden'; b.style.opacity='0'; b.style.pointerEvents='none'; }catch(e){} " +
-                    "} " +
-                    "if(attempt++ > 40) clearInterval(clbInt); " +
-                    "}, 500);"
+                "Custom-Js": `var attempt=0; var clbInt=setInterval(function(){ var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*="play"], .play-btn, .vjs-big-play-button, div[class*="play"], button[class*="play"]'); if(b && b.offsetWidth > 0){ try{b.click();}catch(e){} } if(attempt++ > 40) clearInterval(clbInt); }, 500);`
             }
         });
     } catch (error) {
