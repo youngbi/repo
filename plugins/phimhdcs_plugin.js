@@ -445,12 +445,14 @@ function parseDetailResponse(htmlContent, pageUrl) {
             return JSON.stringify({
                 url: playerUrl,
                 headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Referer": "https://phimhdcs.com/"
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://phimhdcs.com/",
+                    "Custom-Js": "(function() { var s = document.createElement('style'); s.textContent = '#header, #footer, .header, .footer, .sidebar, .sidebar-content, .comment-box, .film-note, .breadcrumb, div[id^=\"ads-\"], div[id*=\"banner\"], div[class*=\"ads-top\"], div[class*=\"ads-bottom\"] { display:none !important; }'; document.head.appendChild(s); })();"
                 },
                 subtitles: []
             });
         };
+
 
         // Helper: decode chunks with salt removal → base64 decode
         var decodeChunksWithSalt = function (chunks, saltString) {
@@ -470,8 +472,20 @@ function parseDetailResponse(htmlContent, pageUrl) {
         var dataMatch = /(?:const|let|var)\s+_0xData\s*=\s*(\{[\s\S]*?\})\s*;/.exec(htmlContent);
         if (dataMatch) {
             // Extract curId (current episode ID)
-            var curIdMatch = /(?:const|let|var)\s+curId\s*=\s*['"](\d+)['"]/.exec(htmlContent);
-            var curId = curIdMatch ? curIdMatch[1] : null;
+            var curId = null;
+            var curIdPatterns = [
+                /(?:const|let|var)\s+curId\s*=\s*['"](\d+)['"]/,
+                /(?:const|let|var)\s+episode\s*=\s*['"](\d+)['"]/,
+                /(?:const|let|var)\s+episode_id\s*=\s*['"](\d+)['"]/,
+                /(?:const|let|var)\s+currentEpisodeId\s*=\s*['"](\d+)['"]/,
+                /data-id="(\d+)"[^>]*class="[^"]*active[^"]*streaming-server/i,
+                /class="[^"]*active[^"]*streaming-server[^"]*"[^>]*data-id="(\d+)"/i
+            ];
+            for (var pi = 0; pi < curIdPatterns.length; pi++) {
+                var m = curIdPatterns[pi].exec(htmlContent);
+                if (m) { curId = m[1]; break; }
+            }
+
 
             try {
                 // Balanced brace extraction for proper JSON
@@ -623,21 +637,34 @@ function parseDetailResponse(htmlContent, pageUrl) {
             }
         }
 
-        // Final fallback: return fallback kèm headers (để WebView chặn quảng cáo)
-        var fullWebUrl = (fallbackUrl && fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimhdcs.com" + (fallbackUrl || ""));
+        // Final fallback: Cố gắng bóc tách div bọc ngoài trình embed thay vì load cả website
+        var playerDivMatch = htmlContent.match(/<div[^>]+(?:id|class)=["'](?:player|box-player|player-content|video-container|streaming-container)["'][^>]*>[\s\S]*?<\/div>/i);
+        if (playerDivMatch) {
+            var playerHtml = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{margin:0;padding:0;background:#000;overflow:hidden;display:flex;justify-content:center;align-items:center;height:100vh;} .player-container{width:100%;height:100%;}</style></head><body><div class="player-container">' + playerDivMatch[0] + '</div></body></html>';
+            return JSON.stringify({
+                url: playerHtml,
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://phimhdcs.com/"
+                },
+                subtitles: []
+            });
+        }
+
+        var currentUrl = (pageUrl && pageUrl.indexOf("http") === 0) ? pageUrl : "https://phimhdcs.com" + (pageUrl || "");
         return JSON.stringify({
-            url: fullWebUrl,
+            url: currentUrl,
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Referer": "https://phimhdcs.com/",
-                // Add header để WebViewClient nhận diện đây là base request và allowed domain
-                "Allowed-Domains": "phimhdcs.com, googleapis.com",
+                "Allowed-Domains": "phimhdcs.com, hoat-hinh.net, cloudfront.net",
+                "Custom-Js": "(function(){ var style=document.createElement('style'); style.textContent='body > *:not(#player):not(#box-player), #header, #footer, .sidebar, .sidebar-content, .ads, .comment-box, .film-note, .breadcrumb { display:none!important; } #player, #box-player { position:fixed!important; top:0!important; left:0!important; width:100vw!important; height:100vh!important; z-index:999999!important; background:#000!important; display:block!important; } body { overflow:hidden!important; background:#000!important; }'; document.head.appendChild(style); })();"
             },
             subtitles: []
         });
+
     } catch (error) {
-        var fallbackCatchUrl = (fallbackUrl && fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimhdcs.com" + (fallbackUrl || ""));
-        return JSON.stringify({ url: fallbackCatchUrl, headers: {}, subtitles: [] });
+        return JSON.stringify({ url: (pageUrl || "https://phimhdcs.com"), headers: {}, subtitles: [] });
     }
 }
 

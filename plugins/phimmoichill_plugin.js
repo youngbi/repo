@@ -416,7 +416,8 @@ function parseDetailResponse(html, fallbackUrl) {
                     url: url,
                     headers: {
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Referer": "https://phimmoichill.my/"
+                        "Referer": "https://phimmoichill.my/",
+                        "Custom-Js": "(function() { var s = document.createElement('style'); s.textContent = '#header, #footer, .header, .footer, .sidebar, .sidebar-content, .comment-box, .film-note, .breadcrumb, div[id^=\"ads-\"], div[id*=\"banner\"], div[class*=\"ads-top\"], div[class*=\"ads-bottom\"] { display:none !important; }'; document.head.appendChild(s); })();"
                     },
                     subtitles: []
                 });
@@ -437,18 +438,34 @@ function parseDetailResponse(html, fallbackUrl) {
             });
         }
 
-        // 3. Fallback: URL của trang kèm header chặn quảng cáo // turbo
+        // 3. Fallback: Cố gắng bóc tách div bọc ngoài trình embed thay vì load cả website
+        var playerDivMatch = html.match(/<div[^>]+(?:id|class)=["'](?:player|box-player|player-content|video-container|streaming-container)["'][^>]*>[\s\S]*?<\/div>/i);
+        if (playerDivMatch) {
+            var playerHtml = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{margin:0;padding:0;background:#000;overflow:hidden;display:flex;justify-content:center;align-items:center;height:100vh;} .player-container{width:100%;height:100%;}</style></head><body><div class="player-container">' + playerDivMatch[0] + '</div></body></html>';
+            return JSON.stringify({
+                url: playerHtml,
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://phimmoichill.my/",
+                    "Custom-Js": "(function() { var s = document.createElement('style'); s.textContent = '#header, #footer, .header, .footer, .sidebar, .sidebar-content, .comment-box, .film-note, .breadcrumb, div[id^=\"ads-\"], div[id*=\"banner\"], div[class*=\"ads-top\"], div[class*=\"ads-bottom\"] { display:none !important; }'; document.head.appendChild(s); })();"
+                },
+                subtitles: []
+            });
+        }
+
         var fullWebUrl = (fallbackUrl && fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimmoichill.my" + (fallbackUrl || ""));
         return JSON.stringify({
             url: fullWebUrl,
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Referer": "https://phimmoichill.my/",
-                // Add header để WebViewClient nhận diện đây là base request và allowed domain
                 "Allowed-Domains": "phimmoichill.my, googleapis.com",
+                "Custom-Js": "(function() { var s = document.createElement('style'); s.textContent = '#header, #footer, .header, .footer, .sidebar, .sidebar-content, .comment-box, .film-note, .breadcrumb, div[id^=\"ads-\"], div[id*=\"banner\"], div[class*=\"ads-top\"], div[class*=\"ads-bottom\"] { display:none !important; }'; document.head.appendChild(s); })();"
             },
             subtitles: []
         });
+
+
 
     } catch (e) {
         return JSON.stringify({ url: "https://phimmoichill.my" + fallbackUrl, headers: {}, subtitles: [] });
