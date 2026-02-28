@@ -1,6 +1,6 @@
 {
-    "latestVersionCode": 22,
-    "latestVersionName": "1.2.2",
-    "releaseNotes": "- Fix lỗi user báo\n- Fix lỗi xóa lịch sử tìm kiếm \n- Giải phóng và tối ưu RAM\n- Thêm logic tự bỏ qua quảng cáo",
+    "latestVersionCode": 23,
+    "latestVersionName": "1.2.3",
+    "releaseNotes": "- Fix lỗi điều khiển trình player cho TV\n- Fix lỗi xóa lịch sử tìm kiếm \n- Giải phóng và tối ưu RAM\n- Thêm logic tự bỏ qua quảng cáo",
     "downloadUrl": "https://raw.githubusercontent.com/youngbi/repo/main/app-release.apk"
 }
