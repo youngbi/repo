@@ -37,13 +37,6 @@
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/hh3d.ico"
         },
         {
-            "id": "phimmoichill",
-            "name": "PhimMoiChill",
-            "version": "1.0.0",
-            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimmoichill_plugin.js",
-            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/phimmoi.webp"
-        },
-        {
             "id": "clbpx",
             "name": "CLB Phim Xưa",
             "version": "1.0.2",
