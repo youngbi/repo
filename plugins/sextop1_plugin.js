@@ -6,7 +6,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "sextop1",
         "name": "Sextop1",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "baseUrl": "https://sextop1.page",
         "iconUrl": "https://stpaulclinic.vn/vaapp/plugins/sextop1.webp",
         "isEnabled": true,
@@ -319,7 +319,8 @@ function parseDetailResponse(html, fallbackUrl) {
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Referer": "https://sextop1.page/",
-                "Allowed-Domains": "spexliu.top, streamqq.com"
+                "Allowed-Domains": "spexliu.top, streamqq.com",
+                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){var b=document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button');if(b){try{b.click();b.style.display='none';clearInterval(clbInt);}catch(e){}}if(attempt++>20)clearInterval(clbInt);},500);"
             },
             subtitles: []
         });
