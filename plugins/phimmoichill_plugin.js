@@ -21,8 +21,8 @@ function getPrimaryCategories() {
         { name: 'Phim Mới', slug: 'phim-moi' },
         { name: 'Phim Lẻ', slug: 'phim-le' },
         { name: 'Phim Bộ', slug: 'phim-bo' },
-        { name: 'Hành Động', slug: 'the-loai/phim-hanh-dong' },
-        { name: 'Chiếu Rạp', slug: 'the-loai/phim-chieu-rap' }
+        { name: 'Hành Động', slug: 'genre/phim-hanh-dong' },
+        { name: 'Chiếu Rạp', slug: 'genre/phim-chieu-rap' }
     ]);
 }
 
@@ -31,8 +31,8 @@ function getHomeSections() {
         { slug: 'phim-moi', title: 'Phim Mới Cập Nhật', type: 'Horizontal', path: '' },
         { slug: 'phim-le', title: 'Phim Lẻ', type: 'Horizontal', path: '' },
         { slug: 'phim-bo', title: 'Phim Bộ', type: 'Horizontal', path: '' },
-        { slug: 'the-loai/phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: '' },
-        { slug: 'the-loai/phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: '' }
+        { slug: 'genre/phim-hanh-dong', title: 'Hành Động', type: 'Horizontal', path: '' },
+        { slug: 'genre/phim-tinh-cam', title: 'Tình Cảm', type: 'Grid', path: '' }
     ]);
 }
 
@@ -40,12 +40,12 @@ function getFilterConfig() {
     return JSON.stringify({
         sort: [],
         category: [
-            { name: "Hành Động", value: "the-loai/phim-hanh-dong" },
-            { name: "Võ Thuật", value: "the-loai/phim-vo-thuat" },
-            { name: "Tình Cảm", value: "the-loai/phim-tinh-cam" },
-            { name: "Hài Hước", value: "the-loai/phim-hai-huoc" },
-            { name: "Hoạt Hình", value: "the-loai/phim-hoat-hinh" },
-            { name: "Chiếu Rạp", value: "the-loai/phim-chieu-rap" }
+            { name: "Hành Động", value: "genre/phim-hanh-dong" },
+            { name: "Võ Thuật", value: "genre/phim-vo-thuat" },
+            { name: "Tình Cảm", value: "genre/phim-tinh-cam" },
+            { name: "Hài Hước", value: "genre/phim-hai-huoc" },
+            { name: "Hoạt Hình", value: "genre/phim-hoat-hinh" },
+            { name: "Chiếu Rạp", value: "genre/phim-chieu-rap" }
         ]
     });
 }
@@ -65,6 +65,10 @@ function getUrlList(slug, filtersJson) {
     }
 
     var url = "https://phimmoichill.my/list/" + baseSlug;
+    if (baseSlug.indexOf("genre") === 0 || baseSlug.indexOf("country") === 0) {
+        url = "https://phimmoichill.my/" + baseSlug;
+    }
+
     if (page > 1) {
         url += "/page-" + page;
     }
@@ -79,7 +83,7 @@ function getUrlSearch(keyword, filtersJson) {
 
 function getUrlDetail(slug) {
     if (slug.indexOf("http") === 0) return slug;
-    return "https://phimmoichill.my/phim/" + slug + ".html";
+    return "https://phimmoichill.my/info/" + slug + ".html";
 }
 
 function getUrlCategories() { return "https://phimmoichill.my/"; }
@@ -124,25 +128,32 @@ function parseListResponse(html) {
         var itemHtml = parts[i];
 
         // Lấy link và ID/Slug
-        var linkMatch = itemHtml.match(/href="([^"]*(?:\/phim\/|\/xem\/|info-)([^"\/]+)(?:\.html|))"/);
+        var linkMatch = itemHtml.match(/href="([^"]*(?:\/phim\/|\/xem\/|\/info\/)([^"\/]+)(?:\.html|))"/);
         if (!linkMatch) linkMatch = itemHtml.match(/href="([^"]+)"/);
 
         var fullUrl = linkMatch ? linkMatch[1] : "";
-        var slugMatch = fullUrl.match(/\/phim\/([^\/.]+)/) || fullUrl.match(/\/xem\/([^\/]+)-pm/);
+        var slugMatch = fullUrl.match(/\/phim\/([^\/.]+)/) || fullUrl.match(/\/xem\/([^\/]+)-pm/) || fullUrl.match(/\/info\/([^\/.]+)/);
         var slug = slugMatch ? slugMatch[1] : (linkMatch ? linkMatch[2] : "");
 
         if (slug) slug = slug.replace(".html", "").replace("info-", "");
 
         // Lấy tiêu đề 
-        var titleMatch = itemHtml.match(/title="([^"]+)"/);
-        var title = titleMatch ? titleMatch[1] : "";
+        var title = "";
+        var pMatch = itemHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (pMatch) title = pMatch[1].replace(/<[^>]*>/g, "").trim();
+
         if (!title) {
-            var h3Match = itemHtml.match(/<h3[^>]*>(?:<a[^>]*>)?([\s\S]*?)(?:<\/a>)?<\/h3>/);
-            if (h3Match) title = h3Match[1];
+            var h3Match = itemHtml.match(/<h3[^>]*>(?:<a[^>]*>)?([\s\S]*?)(?:<\/a>)?<\/h3>/i);
+            if (h3Match) title = h3Match[1].replace(/<[^>]*>/g, "").trim();
             else {
-                var pMatch = itemHtml.match(/<p[^>]*class="name"[^>]*>([\s\S]*?)<\/p>/);
-                if (pMatch) title = pMatch[1];
+                var pMatch2 = itemHtml.match(/<p[^>]*class="name"[^>]*>([\s\S]*?)<\/p>/i);
+                if (pMatch2) title = pMatch2[1].replace(/<[^>]*>/g, "").trim();
             }
+        }
+
+        if (!title && itemHtml.indexOf('title="') > -1) {
+            var maybeTitleMatch = itemHtml.match(/title="([^"]+)"/);
+            if (maybeTitleMatch) title = maybeTitleMatch[1];
         }
 
         // Lấy ảnh Thumbnail
@@ -167,7 +178,7 @@ function parseListResponse(html) {
             if (qualityMatch) labels.push(PluginUtils.cleanText(qualityMatch[1]));
 
             // Tìm 4K đặc biệt
-            if (itemHtml.indexOf("4K") !== -1 && itemHtml.indexOf("4k") !== -1) {
+            if (itemHtml.indexOf("4K") !== -1 || itemHtml.indexOf("4k") !== -1) {
                 if (labels.join(" ").indexOf("4K") === -1) {
                     labels.push("4K");
                 }
@@ -265,46 +276,46 @@ function parseMovieDetail(html) {
         var defaultServerName = "PhimMoi";
 
         // PhimMoiChill thường có list tập dạng <li><a href="...xem/slug-tap-1...">...
-        var defaultEpisodesList = html.match(/<ul[^>]*class="[^"]*list-episode[^"]*"[^>]*>([\s\S]*?)<\/ul>/) ||
-            html.match(/id="halim-list-server"[^>]*>([\s\S]*?)<\/ul>/);
+        // Hoặc có thể nằm rải rác trong các nút "Xem phim"
+        var epsArr = [];
+        var epRegex = /<a[^>]+href="([^"]*(?:\/xem\/)[^"]*)"[^>]*>(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/a>/gi;
+        var epMatch;
+        var seenUrls = {};
 
-        if (defaultEpisodesList) {
-            var epRegex = /<a[^>]*href="([^"]+)"[^>]*>(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/a>/g;
-            var epMatch;
-            var epsArr = [];
-            while ((epMatch = epRegex.exec(defaultEpisodesList[1])) !== null) {
-                var epUrl = epMatch[1];
-                var epName = PluginUtils.cleanText(epMatch[2]);
-                if (epUrl && epName) {
-                    epsArr.push({
-                        id: epUrl.replace("https://phimmoichill.my", ""), // Cắt domain để dễ xử lý khi parseStream
-                        name: epName,
-                        slug: epName
-                    });
-                }
+        // Tìm trong toàn bộ HTML trang info
+        while ((epMatch = epRegex.exec(html)) !== null) {
+            var epUrl = epMatch[1];
+            var epName = PluginUtils.cleanText(epMatch[2]);
+
+            // Nếu là icon-play hoặc không có text rõ ràng, đặt là "Full" hoặc "Play"
+            if (!epName || epName === "" || epMatch[0].indexOf("icon-play") > -1) {
+                epName = "Xem Phim";
             }
-            if (epsArr.length > 0) {
-                serversMap[defaultServerName] = epsArr;
+
+            if (!seenUrls[epUrl]) {
+                epsArr.push({
+                    id: epUrl.replace("https://phimmoichill.my", ""),
+                    name: epName,
+                    slug: epName
+                });
+                seenUrls[epUrl] = true;
             }
         }
 
-        // Nếu không có mảng tập nào hoặc là trang Xem phim (!?)
+        if (epsArr.length > 0) {
+            // Sắp xếp lại nếu cần, hoặc lọc các mảng rác
+            // Thường thì danh sách tập sẽ có tên là "Tập 1", "Tập 2"...
+            // Ưu tiên các link có text là số
+            serversMap[defaultServerName] = epsArr;
+        }
+
+        // Nếu vẫn không có mảng tập nào
         if (!serversMap[defaultServerName] || serversMap[defaultServerName].length === 0) {
-            // Có khi nút "Xem phim" chuyển thẳng sang trang /xem/...
-            var watchMatch = html.match(/href="([^"]+\/xem\/[^"]+)"/);
-            if (watchMatch) {
-                serversMap[defaultServerName] = [{
-                    id: watchMatch[1].replace("https://phimmoichill.my", ""),
-                    name: "Full",
-                    slug: "full"
-                }];
-            } else {
-                serversMap[defaultServerName] = [{
-                    id: "",
-                    name: "Trailer",
-                    slug: "trailer"
-                }];
-            }
+            serversMap[defaultServerName] = [{
+                id: "",
+                name: "Trailer",
+                slug: "trailer"
+            }];
         }
 
         var parsedServers = [];
@@ -379,12 +390,16 @@ function parseDetailResponse(html, fallbackUrl) {
         // Và xử lý autoplay tương tự Sextop1 thông qua Custom-Js.
 
         return JSON.stringify({
-            url: "https://phimmoichill.my" + fallbackUrl, // Kotlin truyền fallbackUrl = id (path của tập)
+            url: (fallbackUrl.indexOf("http") === 0) ? fallbackUrl : ("https://phimmoichill.my" + fallbackUrl),
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Referer": "https://phimmoichill.my/",
-                // Auto play logic dành cho JWPlayer, Video.js thường gặp trên iframe phim
-                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){var b=document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button');if(b){try{b.click();b.style.display='none';clearInterval(clbInt);}catch(e){}}if(attempt++>20)clearInterval(clbInt);},500);"
+                // Script tự động nhấn play và ẩn các thành phần thừa trên TV
+                "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
+                    "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"]'); " +
+                    "if(b && b.offsetWidth > 0){ try{ b.click(); b.style.display='none'; clearInterval(clbInt); } catch(e){} } " +
+                    "if(attempt++ > 30) clearInterval(clbInt); " +
+                    "}, 500);"
             },
             subtitles: []
         });
