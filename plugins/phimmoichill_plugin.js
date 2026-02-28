@@ -86,8 +86,10 @@ function getUrlSearch(keyword, filtersJson) {
 }
 
 function getUrlDetail(slug) {
+    if (!slug) return "https://phimmoichill.my/";
     if (slug.indexOf("http") === 0) return slug;
-    return "https://phimmoichill.my/info/" + slug + ".html";
+    // PhimMoiChill dùng /info/ cho trang chi tiết
+    return "https://phimmoichill.my/info/" + slug.replace(".html", "");
 }
 
 function getUrlCategories() { return "https://phimmoichill.my/"; }
@@ -307,14 +309,15 @@ function parseMovieDetail(html) {
             var epUrl = epMatch[1];
             var epName = PluginUtils.cleanText(epMatch[2]);
 
-            // Nếu là icon-play hoặc không có text rõ ràng, đặt là "Full" hoặc "Play"
+            // Nếu là icon-play hoặc không có text rõ ràng, đặt là "Xem Phim"
             if (!epName || epName === "" || epMatch[0].indexOf("icon-play") > -1) {
                 epName = "Xem Phim";
             }
 
             if (!seenUrls[epUrl]) {
+                var fullEpUrl = (epUrl.indexOf("http") === 0) ? epUrl : ("https://phimmoichill.my" + epUrl);
                 epsArr.push({
-                    id: epUrl.replace("https://phimmoichill.my", ""),
+                    id: fullEpUrl, // Dùng FULL URL để tránh bị app prefix /info/ khi fetch stream
                     name: epName,
                     slug: epName
                 });
@@ -416,11 +419,11 @@ function parseDetailResponse(html, fallbackUrl) {
                 "Referer": "https://phimmoichill.my/",
                 // Script tự động nhấn play và ẩn các thành phần thừa trên TV
                 "Custom-Js": "var attempt=0; var clbInt=setInterval(function(){ " +
-                    "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"]'); " +
+                    "var b = document.querySelector('.jw-display-icon-display, .jw-display-icon-container, img[src*=\\\"play\\\"], .play-btn, .vjs-big-play-button, div[class*=\\\"play\\\"], button[class*=\\\"play\\\"], .icon-play'); " +
                     "if(b && b.offsetWidth > 0){ " +
                     "   try{ b.click(); b.style.visibility='hidden'; b.style.opacity='0'; b.style.pointerEvents='none'; }catch(e){} " +
                     "} " +
-                    "if(attempt++ > 30) { clearInterval(clbInt); } " +
+                    "if(attempt++ > 40) { clearInterval(clbInt); } " +
                     "}, 500);"
             },
             subtitles: []
