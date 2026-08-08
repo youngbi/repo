@@ -2,14 +2,12 @@
 // CONFIGURATION & METADATA
 // =============================================================================
 
-var BASE_URL = "https://vlxx.net";
-
 function getManifest() {
     return JSON.stringify({
         "id": "vlxx",
         "name": "VLXX",
-        "version": "1.0.8",
-        "baseUrl": BASE_URL,
+        "version": "1.0.9",
+        "baseUrl": "https://vlxx.net",
         "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx.ico",
         "isEnabled": true,
         "isAdult": true,
@@ -49,14 +47,6 @@ function getFilterConfig() {
     return JSON.stringify({});
 }
 
-function getBaseUrl(url) {
-    if (url && url.indexOf("http") === 0) {
-        var m = url.match(/https?:\/\/[^\/]+/i);
-        if (m) return m[0];
-    }
-    return BASE_URL;
-}
-
 // =============================================================================
 // URL GENERATION
 // =============================================================================
@@ -64,14 +54,18 @@ function getBaseUrl(url) {
 function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    var baseUrl = BASE_URL;
+    var baseUrl = "https://vlxx.net";
 
     if (slug === '' || slug === 'home') {
-        if (page > 1) return baseUrl + "/new/" + page + "/";
+        if (page > 1) {
+            return baseUrl + "/new/" + page + "/";
+        }
         return baseUrl + "/";
     }
 
-    if (page > 1) return baseUrl + "/" + slug + "/" + page + "/";
+    if (page > 1) {
+        return baseUrl + "/" + slug + "/" + page + "/";
+    }
     return baseUrl + "/" + slug + "/";
 }
 
@@ -79,18 +73,21 @@ function getUrlSearch(keyword, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var safeKeyword = encodeURIComponent(keyword.replace(/\s+/g, '-'));
-    var url = BASE_URL + "/search/" + safeKeyword + "/";
+    var url = "https://vlxx.net/search/" + safeKeyword + "/";
     if (page > 1) {
-        url = BASE_URL + "/search/" + safeKeyword + "/" + page + "/";
+        url = "https://vlxx.net/search/" + safeKeyword + "/" + page + "/";
     }
     return url;
 }
 
+// getUrlDetail: App gọi với episode.id
+// episode.id = canonical URL (có thể kèm #s2 cho server 2)
+// Trả về URL as-is (starts with http) → App fetch trang detail
 function getUrlDetail(slug) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
     if (slug.charAt(0) !== '/') slug = '/' + slug;
-    return BASE_URL + slug;
+    return "https://vlxx.net" + slug;
 }
 
 function getUrlCategories() { return ""; }
@@ -200,11 +197,20 @@ function parseMovieDetail(html) {
             }
         }
 
+        // =====================================================================
+        // episode.id = canonical URL + #s{serverId}
+        // Khi user bấm xem → App gọi getUrlDetail(url#s1) → fetch trang detail
+        // → parseDetailResponse trích data-id + server từ fragment → trả AJAX POST
+        // =====================================================================
+
         var servers = [];
+
+        // Lấy canonical URL
         var canonicalMatch = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)
             || html.match(/<meta[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i);
         var pageUrl = canonicalMatch ? canonicalMatch[1] : "";
 
+        // Tìm server buttons: onclick="server(1,3105)" onclick="server(2,3105)"
         var serverRegex = /onclick=["']server\((\d+),\s*(\d+)\)["']/gi;
         var srvMatch;
 
@@ -220,6 +226,7 @@ function parseMovieDetail(html) {
             });
         }
 
+        // Fallback nếu không tìm thấy server buttons
         if (servers.length === 0 && pageUrl) {
             servers.push({
                 name: "Server #1",
@@ -255,16 +262,18 @@ function parseMovieDetail(html) {
 }
 
 // =============================================================================
-// STREAM RESOLUTION
+// STREAM RESOLUTION (3-step: detail page → AJAX POST → embed page)
 // =============================================================================
 
+// parseDetailResponse: Nhận HTML tĩnh từ detail page
+// Trích data-id + server number → trả AJAX POST config cho App
 function parseDetailResponse(html, fetchedUrl) {
     try {
-        var domain = getBaseUrl(fetchedUrl);
-
-        var dataIdMatch = html.match(/data-id=["'](\d+)["']/i) || html.match(/server\(\d+,\s*(\d+)\)/i);
+        // Trích data-id từ HTML
+        var dataIdMatch = html.match(/data-id=["'](\d+)["']/i);
         var videoId = dataIdMatch ? dataIdMatch[1] : "";
 
+        // Fallback: lấy ID từ URL path (ví dụ: /video/.../3105/)
         if (!videoId && fetchedUrl) {
             var urlIdMatch = fetchedUrl.match(/\/(\d+)\/?(?:#|$)/);
             if (urlIdMatch) videoId = urlIdMatch[1];
@@ -274,28 +283,26 @@ function parseDetailResponse(html, fetchedUrl) {
             return JSON.stringify({ url: "", isEmbed: false, headers: {} });
         }
 
+        // Trích server number từ URL fragment (#s1, #s2)
         var serverId = "1";
         if (fetchedUrl) {
             var fragMatch = fetchedUrl.match(/#s(\d+)/);
             if (fragMatch) serverId = fragMatch[1];
         }
 
+        // Trích device type từ HTML
         var deviceMatch = html.match(/deviceType\s*=\s*['"](\w+)['"]/i);
         var deviceType = deviceMatch ? deviceMatch[1] : "mobile";
         var vlxxServer = (deviceType === "desktop") ? "1" : "2";
 
-        // CHỈ ĐỊNH REGEX CHUẨN ĐÃ LOẠI TRỪ TÊN MIỀN CDN (PHẢI CÓ DẤU / TRƯỚC DUÔI FILE)
+        // Trả config để App POST tới /ajax.php
         return JSON.stringify({
-            url: domain + "/ajax.php",
+            url: "https://vlxx.net/ajax.php",
             isEmbed: true,
             postBody: "vlxx_server=" + vlxxServer + "&id=" + videoId + "&server=" + serverId,
             headers: {
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Referer": fetchedUrl || (domain + "/"),
-                "Origin": domain,
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-                "Stream-Regex": "https?:\\/\\/[^\"'\\s]+\\/[^\"'\\s]+\\.(?:vl|m3u8|mp4)(?:\\?[^\"'\\s]*)?"
+                "Referer": "https://vlxx.net/",
+                "Stream-Regex": "https?:\\/\\/[^\"'\\s]+\\.(?:vl|m3u8|mp4)[^\"'\\s]*"
             }
         });
     } catch (error) {
@@ -303,28 +310,24 @@ function parseDetailResponse(html, fetchedUrl) {
     }
 }
 
+// parseEmbedResponse: Xử lý 2 loại response:
+// Depth 1 - AJAX JSON: {"player":"<iframe src=\"...\">"}  → trích iframe URL
+// Depth 2 - Embed HTML: JWPlayer sources với .vl URL      → trích stream URL
 function parseEmbedResponse(html, url) {
     try {
-        var cleanHtml = html;
-        if (cleanHtml.indexOf('\\/') !== -1) {
-            cleanHtml = cleanHtml.replace(/\\\//g, '/');
-        }
-        if (cleanHtml.indexOf('\\"') !== -1) {
-            cleanHtml = cleanHtml.replace(/\\"/g, '"');
-        }
-
-        // CASE 1: Response từ ajax.php (chứa JSON player iframe)
-        if (cleanHtml.indexOf('"player"') !== -1 || cleanHtml.indexOf('player') !== -1) {
+        // === CASE 1: AJAX JSON response (chứa "player" key) ===
+        // Response dạng: {"player":"<iframe src=\"https:\/\/play.vlstream.net\/embed\/hash\/s1\" ...>"}
+        // Cần JSON.parse để unescape \/ thành / và \" thành "
+        if (html.indexOf('"player"') !== -1) {
             try {
                 var jsonObj = JSON.parse(html);
                 if (jsonObj && jsonObj.player) {
-                    var playerHtml = jsonObj.player.replace(/\\\//g, '/');
+                    var playerHtml = jsonObj.player;
+                    // playerHtml giờ là clean HTML: <iframe src="https://play.vlstream.net/embed/hash/s1" ...>
                     var srcMatch = playerHtml.match(/src=["']([^"']+)["']/i);
                     if (srcMatch) {
-                        var embedUrl = srcMatch[1];
-                        if (embedUrl.indexOf('//') === 0) embedUrl = 'https:' + embedUrl;
                         return JSON.stringify({
-                            url: embedUrl,
+                            url: srcMatch[1],
                             isEmbed: true,
                             headers: {
                                 "Referer": "https://vlxx.net/"
@@ -332,90 +335,85 @@ function parseEmbedResponse(html, url) {
                         });
                     }
                 }
-            } catch (parseErr) {}
-
-            var iframeMatch = cleanHtml.match(/src=["']([^"']+)["']/i);
-            if (iframeMatch) {
-                var iframeUrl = iframeMatch[1];
-                if (iframeUrl.indexOf('//') === 0) iframeUrl = 'https:' + iframeUrl;
-                return JSON.stringify({
-                    url: iframeUrl,
-                    isEmbed: true,
-                    headers: {
-                        "Referer": "https://vlxx.net/"
-                    }
-                });
+            } catch (parseErr) {
+                // Fallback: regex trên raw JSON string
+                // Unescape \/ trước khi match
+                var cleaned = html.replace(/\\\//g, '/');
+                // Match src=\"URL\" hoặc src=\\"URL\\"
+                var iframeMatch = cleaned.match(/src=(?:\\\\)?["'](https?:\/\/[^"'\\]+)(?:\\\\)?["']/i);
+                if (iframeMatch) {
+                    return JSON.stringify({
+                        url: iframeMatch[1],
+                        isEmbed: true,
+                        headers: {
+                            "Referer": "https://vlxx.net/"
+                        }
+                    });
+                }
             }
         }
 
-        // CASE 2: Trang Embed HTML (trích luồng trực tiếp .vl/.m3u8 - BỎ QUA HOÀN TOÀN FILE .js)
-        var fileMatch = cleanHtml.match(/"file"\s*:\s*"(https?[^"]+\.(?:vl|m3u8|mp4)(?:\?[^"]*)?)"/i);
+        // === CASE 2: Embed page HTML (JWPlayer with .vl sources) ===
+        var fileMatch = html.match(/"file"\s*:\s*"(https?[^"]+\.vl[^"]*)"/i);
         if (fileMatch) {
-            var streamUrl = fileMatch[1].replace(/\\\//g, '/');
-            if (streamUrl.indexOf('.js') === -1) {
-                return JSON.stringify({
-                    url: streamUrl,
-                    isEmbed: false,
-                    mimeType: "application/x-mpegURL",
-                    headers: {
-                        "Referer": "https://play.vlstream.net/"
-                    }
-                });
-            }
+            return JSON.stringify({
+                url: fileMatch[1],
+                isEmbed: false,
+                mimeType: "application/x-mpegURL",
+                headers: {
+                    "Referer": "https://play.vlstream.net/"
+                }
+            });
         }
 
-        var sourcesMatch = cleanHtml.match(/sources\s*:\s*(\[[^\]]+\])/i);
+        // Thử parse sources array
+        var sourcesMatch = html.match(/sources\s*:\s*(\[[^\]]+\])/i);
         if (sourcesMatch) {
             try {
                 var sources = JSON.parse(sourcesMatch[1]);
                 if (sources && sources.length > 0 && sources[0].file) {
                     var sFile = sources[0].file;
-                    if (sFile.indexOf('.js') === -1) {
-                        var isHls = (sources[0].type === 'hls') || sFile.indexOf('.vl') !== -1 || sFile.indexOf('.m3u8') !== -1;
-                        return JSON.stringify({
-                            url: sFile,
-                            isEmbed: false,
-                            mimeType: isHls ? 'application/x-mpegURL' : (sFile.indexOf('.mp4') !== -1 ? 'video/mp4' : ''),
-                            headers: {
-                                "Referer": "https://play.vlstream.net/"
-                            }
-                        });
-                    }
+                    var isHls = (sources[0].type === 'hls') || sFile.indexOf('.vl') !== -1 || sFile.indexOf('.m3u8') !== -1;
+                    return JSON.stringify({
+                        url: sFile,
+                        isEmbed: false,
+                        mimeType: isHls ? 'application/x-mpegURL' : (sFile.indexOf('.mp4') !== -1 ? 'video/mp4' : ''),
+                        headers: {
+                            "Referer": "https://play.vlstream.net/"
+                        }
+                    });
                 }
-            } catch (e) {}
+            } catch (e) {
+                var regexFile = sourcesMatch[1].match(/"file"\s*:\s*"([^"]+)"/i);
+                if (regexFile) {
+                    return JSON.stringify({
+                        url: regexFile[1],
+                        isEmbed: false,
+                        mimeType: "application/x-mpegURL",
+                        headers: {
+                            "Referer": "https://play.vlstream.net/"
+                        }
+                    });
+                }
+            }
         }
 
-        var vlMatch = cleanHtml.match(/(https?:\/\/[^\s"'\\]+\/(?:[^\s"'\\]+\.)*(?:vl|m3u8)(?:\?[^\s"'\\]*)?)/i);
+        // Tìm bất kỳ URL .vl nào
+        var vlMatch = html.match(/(https?:\/\/[^\s"'\\]+\.vl[^\s"'\\]*)/i);
         if (vlMatch) {
-            var candidateUrl = vlMatch[1];
-            if (candidateUrl.indexOf('.js') === -1) {
-                return JSON.stringify({
-                    url: candidateUrl,
-                    isEmbed: false,
-                    mimeType: "application/x-mpegURL",
-                    headers: {
-                        "Referer": "https://play.vlstream.net/"
-                    }
-                });
-            }
+            return JSON.stringify({
+                url: vlMatch[1],
+                isEmbed: false,
+                mimeType: "application/x-mpegURL",
+                headers: {
+                    "Referer": "https://play.vlstream.net/"
+                }
+            });
         }
 
-        // CASE 3: Không lấy được luồng tĩnh -> DỪNG ĐỆ QUY LẬP TỨC! Trả về chính URL Embed để Sniffer ngầm bắt luồng động khi chạy
-        return JSON.stringify({
-            url: url,
-            isEmbed: true,
-            headers: {
-                "Referer": "https://vlxx.net/"
-            }
-        });
-
+        // Không tìm được gì → trả empty để dừng recursive loop
+        return JSON.stringify({ url: "", isEmbed: false, headers: {} });
     } catch (e) {
-        return JSON.stringify({
-            url: url,
-            isEmbed: true,
-            headers: {
-                "Referer": "https://vlxx.net/"
-            }
-        });
+        return JSON.stringify({ url: "", isEmbed: false, headers: {} });
     }
 }
