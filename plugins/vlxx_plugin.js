@@ -8,7 +8,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "vlxx",
         "name": "VLXX",
-        "version": "1.0.7",
+        "version": "1.0.8",
         "baseUrl": BASE_URL,
         "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx.ico",
         "isEnabled": true,
@@ -284,6 +284,7 @@ function parseDetailResponse(html, fetchedUrl) {
         var deviceType = deviceMatch ? deviceMatch[1] : "mobile";
         var vlxxServer = (deviceType === "desktop") ? "1" : "2";
 
+        // CHỈ ĐỊNH REGEX CHUẨN ĐÃ LOẠI TRỪ TÊN MIỀN CDN (PHẢI CÓ DẤU / TRƯỚC DUÔI FILE)
         return JSON.stringify({
             url: domain + "/ajax.php",
             isEmbed: true,
@@ -294,7 +295,7 @@ function parseDetailResponse(html, fetchedUrl) {
                 "Referer": fetchedUrl || (domain + "/"),
                 "Origin": domain,
                 "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-                "Stream-Regex": "https?:\\/\\/[^\"'\\s]+\\.(?:vl|m3u8|mp4)[^\"'\\s]*"
+                "Stream-Regex": "https?:\\/\\/[^\"'\\s]+\\/[^\"'\\s]+\\.(?:vl|m3u8|mp4)(?:\\?[^\"'\\s]*)?"
             }
         });
     } catch (error) {
@@ -347,7 +348,7 @@ function parseEmbedResponse(html, url) {
             }
         }
 
-        // CASE 2: Trang Embed HTML (trích luồng trực tiếp .vl/.m3u8 - LOẠI TRỪ CÁC FILE .js)
+        // CASE 2: Trang Embed HTML (trích luồng trực tiếp .vl/.m3u8 - BỎ QUA HOÀN TOÀN FILE .js)
         var fileMatch = cleanHtml.match(/"file"\s*:\s*"(https?[^"]+\.(?:vl|m3u8|mp4)(?:\?[^"]*)?)"/i);
         if (fileMatch) {
             var streamUrl = fileMatch[1].replace(/\\\//g, '/');
@@ -384,7 +385,7 @@ function parseEmbedResponse(html, url) {
             } catch (e) {}
         }
 
-        var vlMatch = cleanHtml.match(/(https?:\/\/[^\s"'\\]+\.(?:vl|m3u8)(?:\?[^\s"'\\]*)?)/i);
+        var vlMatch = cleanHtml.match(/(https?:\/\/[^\s"'\\]+\/(?:[^\s"'\\]+\.)*(?:vl|m3u8)(?:\?[^\s"'\\]*)?)/i);
         if (vlMatch) {
             var candidateUrl = vlMatch[1];
             if (candidateUrl.indexOf('.js') === -1) {
@@ -399,7 +400,7 @@ function parseEmbedResponse(html, url) {
             }
         }
 
-        // CASE 3: Không lấy được luồng tĩnh -> DỪNG NẠP ĐỆ QUY LẬP TỨC! Trả về chính URL Embed để Sniffer ngầm bắt luồng động khi chạy
+        // CASE 3: Không lấy được luồng tĩnh -> DỪNG ĐỆ QUY LẬP TỨC! Trả về chính URL Embed để Sniffer ngầm bắt luồng động khi chạy
         return JSON.stringify({
             url: url,
             isEmbed: true,
