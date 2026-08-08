@@ -96,7 +96,7 @@
         {
             "id": "vlxx",
             "name": "VLXX",
-            "version": "1.0.8",
+            "version": "1.0.9",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx.ico"
         },
