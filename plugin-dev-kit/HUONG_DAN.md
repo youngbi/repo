@@ -390,6 +390,8 @@ Khi đăng ký plugin trên file JSON hoặc thêm nguồn tùy chỉnh, đườ
 | `debug` | Boolean | `false` | Bật Console Toast nổi |
 | `popup_notice` | String | `""` | Thông báo Popup tùy biến (Text, HTML, CSS, Ảnh QR...) hiện ở trang chủ plugin 1 lần/phiên |
 | `popup_html` | String | `""` | Alias tương thích cho `popup_notice` |
+| `popup_notice` | String | `""` | Thông báo Popup tùy biến (Text, HTML, CSS, Ảnh QR...) hiện ở trang chủ plugin 1 lần/phiên |
+| `popup_html` | String | `""` | Alias tương thích cho `popup_notice` |
 
 **`debug` — Console Toast dành cho phát triển plugin:**
 - Không khai báo `debug`, hoặc đặt `"debug": false`: Console Toast **không hiển thị**.

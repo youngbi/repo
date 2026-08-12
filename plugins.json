@@ -54,7 +54,7 @@
         {
             "id": "123av",
             "name": "123AV",
-            "version": "1.0.5",
+            "version": "1.0.4",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/123av_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/missav.ico"
         },
@@ -68,14 +68,14 @@
         {
             "id": "sextop1",
             "name": "Sextop1",
-            "version": "1.1.9",
+            "version": "1.1.8",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/sextop1_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/sextop1.webp"
         },
         {
             "id": "sextop2",
             "name": "Sextop2",
-            "version": "1.1.7",
+            "version": "1.1.6",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/sextop2_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/sextop1.webp"
         },
@@ -89,14 +89,14 @@
         {
             "id": "javhd",
             "name": "JavHD",
-            "version": "1.0.6",
+            "version": "1.0.5",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/javhd_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/javhd.ico"
         },
         {
             "id": "vlxx",
             "name": "VLXX",
-            "version": "1.0.9",
+            "version": "1.0.5",
             "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx_plugin.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx.ico"
         },

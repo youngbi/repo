@@ -6,8 +6,8 @@ function getManifest() {
     return JSON.stringify({
         "id": "vlxx",
         "name": "VLXX",
-        "version": "1.0.9",
-        "baseUrl": "https://vlxx.net",
+        "version": "1.0.5",
+        "baseUrl": "https://vlxx.moi",
         "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/vlxx.ico",
         "isEnabled": true,
         "isAdult": true,
@@ -54,7 +54,7 @@ function getFilterConfig() {
 function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    var baseUrl = "https://vlxx.net";
+    var baseUrl = "https://vlxx.moi";
 
     if (slug === '' || slug === 'home') {
         if (page > 1) {
@@ -73,9 +73,9 @@ function getUrlSearch(keyword, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var safeKeyword = encodeURIComponent(keyword.replace(/\s+/g, '-'));
-    var url = "https://vlxx.net/search/" + safeKeyword + "/";
+    var url = "https://vlxx.moi/search/" + safeKeyword + "/";
     if (page > 1) {
-        url = "https://vlxx.net/search/" + safeKeyword + "/" + page + "/";
+        url = "https://vlxx.moi/search/" + safeKeyword + "/" + page + "/";
     }
     return url;
 }
@@ -87,7 +87,7 @@ function getUrlDetail(slug) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
     if (slug.charAt(0) !== '/') slug = '/' + slug;
-    return "https://vlxx.net" + slug;
+    return "https://vlxx.moi" + slug;
 }
 
 function getUrlCategories() { return ""; }
@@ -297,11 +297,11 @@ function parseDetailResponse(html, fetchedUrl) {
 
         // Trả config để App POST tới /ajax.php
         return JSON.stringify({
-            url: "https://vlxx.net/ajax.php",
+            url: "https://vlxx.moi/ajax.php",
             isEmbed: true,
             postBody: "vlxx_server=" + vlxxServer + "&id=" + videoId + "&server=" + serverId,
             headers: {
-                "Referer": "https://vlxx.net/",
+                "Referer": "https://vlxx.moi/",
                 "Stream-Regex": "https?:\\/\\/[^\"'\\s]+\\.(?:vl|m3u8|mp4)[^\"'\\s]*"
             }
         });
@@ -330,7 +330,7 @@ function parseEmbedResponse(html, url) {
                             url: srcMatch[1],
                             isEmbed: true,
                             headers: {
-                                "Referer": "https://vlxx.net/"
+                                "Referer": "https://vlxx.moi/"
                             }
                         });
                     }
@@ -346,7 +346,7 @@ function parseEmbedResponse(html, url) {
                         url: iframeMatch[1],
                         isEmbed: true,
                         headers: {
-                            "Referer": "https://vlxx.net/"
+                            "Referer": "https://vlxx.moi/"
                         }
                     });
                 }
