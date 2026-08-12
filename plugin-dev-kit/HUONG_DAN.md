@@ -199,6 +199,24 @@ Nhưng nếu bạn muốn phần đó là data của plugin (không gửi lên s
 return "https://api.site.com/m?page=1|data:secretToken";
 ```
 
+### 📦 Truyền Dữ Liệu `datasend` Liền Mạch Giữa Các Màn Hình
+
+Từ các bản App gần đây, hệ thống hỗ trợ truyền và bảo tồn thuộc tính `datasend` tự động qua từng màn hình (Home → Detail → Player/Reader):
+
+1. **Từ Danh sách phim sang Chi tiết phim (`parseMovieDetail`)**:
+   - Khi `parseListResponse()` hoặc `parseSearchResponse()` trả về item có `datasend` (hoặc `id` dạng `slug|data:...`), App tự động trích xuất chuỗi data này và truyền thẳng vào tham số thứ 3 của hàm `parseMovieDetail(html, apiUrl, datasend)`:
+   ```javascript
+   function parseMovieDetail(html, apiUrl, datasend) {
+       console.log("datasend nhận được từ danh sách:", datasend);
+       // ...
+   }
+   ```
+2. **Từ Chi tiết phim sang Phát video (`getStreamLink` / `parseDetailResponse`)**:
+   - Tương tự, nếu từng tập phim trong mảng `episodes` có `datasend` (hoặc `id` dạng `ep-1|data:...`), App bảo toàn và truyền chuỗi này vào:
+     - `getStreamLink(episodeId, datasend)`
+     - `parseDetailResponse(html, apiUrl, datasend)`
+   - Giúp dev plugin truyền nguyên vẹn các token mã hóa, key giải mã hoặc tham số riêng giữa các bước mà không lo bị rơi mất khi chuyển giao diện.
+
 ### Cách bóc data trong hàm parse
 
 ```javascript
@@ -310,14 +328,14 @@ Khi đăng ký plugin trên file JSON hoặc thêm nguồn tùy chỉnh, đườ
 |-----|----------|--------|
 | `parseListResponse(html, apiUrl)` | HTML/JSON thô + URL đã gọi | `{ items: [...], pagination: {...} }` |
 | `parseSearchResponse(html, apiUrl)` | HTML/JSON thô + URL đã gọi | Giống parseListResponse |
-| `parseMovieDetail(html, apiUrl)` | HTML chi tiết + URL đã gọi | `{ id, title, servers: [...], ... }` |
-| `parseDetailResponse(html, apiUrl)` | HTML trang xem + URL đã gọi | `{ url, headers, mimeType, ... }` |
+| `parseMovieDetail(html, apiUrl, datasend)` | HTML chi tiết + URL đã gọi + datasend | `{ id, title, servers: [...], ... }` |
+| `parseDetailResponse(html, apiUrl, datasend)` | HTML trang xem + URL đã gọi + datasend | `{ url, headers, mimeType, ... }` |
 | `parseEmbedResponse(html, url)` | HTML embed page + URL embed | `{ url, isEmbed, mimeType, ... }` |
 | `parseCategoriesResponse(html, apiUrl)` | HTML thể loại | Mảng `Category` hoặc `FilterOption` |
 | `parseCountriesResponse(html)` | HTML quốc gia | Mảng `FilterOption` |
 | `parseYearsResponse(html)` | HTML năm | Mảng `FilterOption` |
 
-> 💡 Tham số thứ 2 là **tùy chọn** — plugin cũ chỉ khai báo `function parseListResponse(html)` vẫn chạy bình thường. Chỉ khai thêm khi bạn cần đọc `|data:` hoặc cần biết domain thật sau redirect.
+> 💡 Các tham số `apiUrl` và `datasend` là **tùy chọn** — plugin cũ chỉ khai báo `function parseListResponse(html)` vẫn chạy bình thường. Khai báo thêm khi bạn cần đọc `datasend`, `|data:` hoặc cần biết domain thật sau redirect.
 
 ---
 
@@ -370,6 +388,8 @@ Khi đăng ký plugin trên file JSON hoặc thêm nguồn tùy chỉnh, đườ
 | `subtitleCat` | Boolean | `false` | Bật tự tìm phụ đề từ subtitlecat.com |
 | `adblock` | Boolean | `true` | Bật/tắt bộ chặn quảng cáo nền |
 | `debug` | Boolean | `false` | Bật Console Toast nổi |
+| `popup_notice` | String | `""` | Thông báo Popup tùy biến (Text, HTML, CSS, Ảnh QR...) hiện ở trang chủ plugin 1 lần/phiên |
+| `popup_html` | String | `""` | Alias tương thích cho `popup_notice` |
 
 **`debug` — Console Toast dành cho phát triển plugin:**
 - Không khai báo `debug`, hoặc đặt `"debug": false`: Console Toast **không hiển thị**.
