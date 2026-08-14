@@ -423,6 +423,43 @@ function parseListResponse(html, apiUrl) {
 
 > Biến riêng như `DEV = "true"` không bật Console Toast. Cờ phải nằm trong object do `getManifest()` trả về và có tên chính xác là `debug`.
 
+#### 🧩 Gán Biến Trong Manifest (popup_html...)
+
+Để tránh nhồi một khối HTML dài vào trong `getManifest()`, bạn có thể khai báo giá trị ở **bất kỳ đâu trong file JS** (đầu file, ngoài hàm, hoặc trong hàm trước `return`) rồi tham chiếu tên biến:
+
+```javascript
+// Khai báo ở đầu file — khỏi lòi ra khối HTML dài trong getManifest()
+var DONATE_HTML = `<div class='donate-container'>
+    <h2 class='donate-heading'>DONATE</h2>
+    <p class='donate-description'>Ủng hộ bọn mình nhé!</p>
+</div>`;
+
+function getManifest() {
+    return JSON.stringify({
+        "id": "vlxx",
+        "name": "VLXX",
+        "version": "1.0.3",
+        "popup_html": DONATE_HTML,
+        "isEnabled": true
+    });
+}
+```
+
+> ⚠️ **Lưu ý:** Giá trị phải là **một string literal duy nhất** (một cặp dấu nháy). App KHÔNG hỗ trợ nối chuỗi bằng `+` hay template interpolation `${...}`.
+
+**Quy tắc:**
+
+- Hỗ trợ `var` / `let` / `const`.
+- Hỗ trợ cả 3 loại dấu nháy: `"..."`, `'...'`, `` `...` `` (backtick dễ nhìn nhất khi HTML chứa cả `"` lẫn `'`).
+- Giá trị phải là **một string literal duy nhất** — KHÔNG hỗ trợ:
+  - Nối chuỗi bằng `+`
+  - Template interpolation `${...}`
+  - Gán chéo biến (`var A = B;` rồi dùng `A`)
+- Nếu khai báo trùng tên, **khai báo sau cùng** được dùng.
+- Không nên đặt tên biến trùng với key của manifest (`id`, `name`, `type`, `version`...).
+- Chỉ được dùng biến ở **vị trí giá trị** (sau dấu `:`), không dùng làm key.
+- `id` và `version` nên để literal (version có regex đọc riêng khi so sánh bản).
+
 ---
 
 ### 🌐 Domain Fallback — Tự Đổi Domain Khi Bị Chặn
