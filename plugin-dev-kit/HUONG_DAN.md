@@ -888,6 +888,64 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
 ---
 
+#### 📂 Cấu Trúc Lồng Server & Chất Lượng Trong Từng Tập (`ids`) ⭐ (Mới)
+
+Nếu nguồn phim có nhiều server hoặc nhiều chất lượng khác nhau cho cùng một tập (ví dụ: Season có 50 tập, mỗi tập lại có 3-4 nguồn phát/chất lượng 4K/1080p/720p), việc chia ra thành 4 Server riêng biệt bên ngoài sẽ làm danh sách tab bị rối.
+
+Bạn có thể lồng danh sách các nguồn phát trực tiếp vào mảng **`ids`** của từng tập:
+
+##### Cấu trúc JSON khai báo trong `parseMovieDetail()`:
+```json
+{
+    "id": "su-huynh-qua-can-trong",
+    "title": "Sư Huynh Quá Cẩn Trọng",
+    "posterUrl": "https://img.com/poster.jpg",
+    "servers": [
+        {
+            "name": "Nguồn Phim",
+            "episodes": [
+                {
+                    "name": "Tập 1",
+                    "slug": "tap-1",
+                    "id": "",
+                    "ids": [
+                        {
+                            "name": "Server VIP (4K)",
+                            "url": "https://server1.com/stream/tap-1-4k.m3u8",
+                            "datasend": ""
+                        },
+                        {
+                            "name": "Server Nhanh (1080p)",
+                            "url": "https://server2.com/stream/tap-1-1080p.m3u8",
+                            "datasend": ""
+                        },
+                        {
+                            "name": "Server Dự Phòng (720p)",
+                            "url": "https://server3.com/api/get-stream?ep=1",
+                            "datasend": "custom_token_if_needed"
+                        }
+                    ]
+                },
+                {
+                    "name": "Tập 2",
+                    "slug": "tap-2",
+                    "id": "https://server1.com/stream/tap-2.m3u8"
+                }
+            ]
+        }
+    ]
+}
+```
+
+##### 📱 Trải Nghiệm Trên App (Mobile & Android TV):
+1. **Khi tập có `ids` (nhiều hơn 1 nguồn)**:
+   - Khi người dùng bấm vào tập đó, App sẽ tự động hiển thị **Bảng chọn chất lượng & nguồn** (BottomSheet trên Mobile, Dialog điều hướng D-pad trên Android TV).
+   - Người dùng bấm chọn nguồn nào thì App sẽ phát ngay nguồn đó với đầy đủ URL & `datasend` tương ứng.
+2. **Khi tập có 1 nguồn hoặc chỉ có `id`**:
+   - App phát trực tiếp ngay lập tức mà không cần mở thêm bảng chọn.
+
+---
+
 ### `parseDetailResponse()` — Lấy Link Video
 
 #### Trường hợp đơn giản (link trực tiếp):
