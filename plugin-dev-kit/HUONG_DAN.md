@@ -175,13 +175,13 @@ App **luôn cắt bỏ toàn bộ phần sau dấu `|` trước khi gửi HTTP r
 
 ### Bảng so sánh nhanh
 
-| URL plugin trả về | App fetch URL | Header gắn thêm | `apiUrl` mà parseXxx nhận |
-|-------------------|---------------|-----------------|---------------------------|
-| `https://s.com/a\|data:xyz` | `https://s.com/a` | *(không)* | `https://s.com/a\|data:xyz` |
-| `https://s.com/a\|data:k=v` | `https://s.com/a` | *(không)* | `https://s.com/a\|data:k=v` |
-| `https://s.com/a\|Referer=https://s.com` | `https://s.com/a` | `Referer: https://s.com` | `https://s.com/a\|Referer=...` |
-| `https://s.com/a\|xyz` | `https://s.com/a` | *(không)* | `https://s.com/a\|xyz` |
-| `https://s.com/a?ids=1\|2\|3` | `https://s.com/a?ids=1\|2\|3` | *(không)* | URL nguyên vẹn |
+| URL plugin trả về | App fetch URL | Header gắn thêm | `apiUrl` (Tham số 2) | `datasend` (Tham số 3) |
+|-------------------|---------------|-----------------|----------------------|------------------------|
+| `https://s.com/a\|data:xyz` | `https://s.com/a` | *(không)* | `https://s.com/a` (Sạch) | `xyz` |
+| `https://s.com/a\|data:k=v` | `https://s.com/a` | *(không)* | `https://s.com/a` (Sạch) | `k=v` |
+| `https://s.com/a\|Referer=https://s.com` | `https://s.com/a` | `Referer: https://s.com` | `https://s.com/a` (Sạch) | *(rỗng)* |
+| `https://s.com/a\|xyz` | `https://s.com/a` | *(không)* | `https://s.com/a` (Sạch) | `xyz` |
+| `https://s.com/a?ids=1\|2\|3` | `https://s.com/a?ids=1\|2\|3` | *(không)* | URL nguyên vẹn | *(rỗng)* |
 
 ### 🔓 Ngoại lệ: dấu `|` nằm trong query string
 
@@ -646,6 +646,45 @@ Lưu ý về header:
 - `Custom-Js` được thực thi trong luồng WebView/sniffer và không được gửi như HTTP header media.
 - Mỗi lần sniffer bắt được stream, URL và header của lần bắt đó được đóng gói riêng trước khi gửi player.
 - Nếu đã có URL trực tiếp, dùng `isEmbed: false` và MIME phù hợp thay vì ép qua WebView.
+
+---
+
+### ⏩ Tự Động Bỏ Qua Quảng Cáo (`skipTimes`) & Đồng Bộ Phụ Đề Bị Lệch (`timeOffset`)
+
+Nếu nguồn phim của bạn có chèn các đoạn quảng cáo (ví dụ 30s đầu phim, hoặc đoạn 2:00 -> 2:30), bạn có thể cấu hình để ExoPlayer **tự động nhảy qua các đoạn này** và **tự động đồng bộ lại mốc thời gian phụ đề**:
+
+#### 1. Cấu hình `skipTimes` trong hàm `getStreamLink` hoặc `parseDetailResponse`
+
+Trả về mảng `skipTimes` chứa các khoảng thời gian cần tự động tua qua (tính bằng giây):
+
+```javascript
+function getStreamLink(episodeId, datasend) {
+    return JSON.stringify({
+        url: "https://domain.com/video.m3u8",
+        headers: { "Referer": "https://domain.com/" },
+
+        // ⏩ Danh sách các đoạn tự động nhảy qua (tính bằng giây)
+        skipTimes: [
+            { start: 0, end: 30, type: "ad" },      // Bỏ qua 30s quảng cáo đầu (0:00 -> 0:30)
+            { start: 120, end: 150, type: "ad" }    // Bỏ qua 30s quảng cáo ở phút 2:00 -> 2:30
+        ],
+
+        subtitles: [
+            {
+                lang: "Vietsub (Đã bù 30s QC)",
+                url: "https://sub.com/vi.vtt",
+                // ⏱️ timeOffset: Dời mốc thời gian phụ đề (tính bằng giây) để khớp với video bị chèn QC
+                timeOffset: 30
+            }
+        ]
+    });
+}
+```
+
+- **Khi mở phim từ đầu (`00:00`)**: Nếu có đoạn skip từ `0s -> 30s`, Player sẽ tự động bắt đầu phát ngay từ giây thứ 30.
+- **Trong quá trình xem**: Khi thời gian phát chạm mốc `start`, Player tự động seek đến mốc `end`.
+- **Phụ đề (`timeOffset`)**: App sẽ tự động dịch chuyển toàn bộ timestamp trong file phụ đề SRT/WebVTT tương ứng theo số giây offset để khớp 100% với video stream.
+- **Tùy chỉnh Subtitle Delay trên Player**: Người dùng cũng có thể tự do chỉnh nhanh độ trễ `[-5s]`, `[-1s]`, `[-0.5s]`, `[0s]`, `[+0.5s]`, `[+1s]`, `[+5s]`, `[+30s]` trực tiếp trong menu Cài đặt phụ đề trên cả Mobile và TV.
 
 ---
 
