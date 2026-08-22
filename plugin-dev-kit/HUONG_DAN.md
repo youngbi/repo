@@ -199,25 +199,90 @@ Nhưng nếu bạn muốn phần đó là data của plugin (không gửi lên s
 return "https://api.site.com/m?page=1|data:secretToken";
 ```
 
-### 📦 Truyền Dữ Liệu `datasend` Liền Mạch Giữa Các Màn Hình
+### 📦 Truyền Dữ Liệu `datasend` Liền Mạch Giữa Các Màn Hình & Bỏ Qua Fetch Lại Chi Tiết
 
-Từ các bản App gần đây, hệ thống hỗ trợ truyền và bảo tồn thuộc tính `datasend` tự động qua từng màn hình (Home → Detail → Player/Reader):
+Hệ thống hỗ trợ truyền và bảo tồn thuộc tính `datasend` tự động qua từng màn hình (Home/List → Detail → Player/Reader):
 
-1. **Từ Danh sách phim sang Chi tiết phim (`parseMovieDetail`)**:
-   - Khi `parseListResponse()` hoặc `parseSearchResponse()` trả về item có `datasend` (hoặc `id` dạng `slug|data:...`), App tự động trích xuất chuỗi data này và truyền thẳng vào tham số thứ 3 của hàm `parseMovieDetail(html, apiUrl, datasend)`:
-   ```javascript
-   function parseMovieDetail(html, apiUrl, datasend) {
-       console.log("datasend nhận được từ danh sách:", datasend);
-       // ...
-   }
-   ```
-2. **Từ Chi tiết phim sang Phát video (`getStreamLink` / `parseDetailResponse`)**:
-   - Tương tự, nếu từng tập phim trong mảng `episodes` có `datasend` (hoặc `id` dạng `ep-1|data:...`), App bảo toàn và truyền chuỗi này vào:
-     - `getStreamLink(episodeId, datasend)`
-     - `parseDetailResponse(html, apiUrl, datasend)`
-   - Giúp dev plugin truyền nguyên vẹn các token mã hóa, key giải mã hoặc tham số riêng giữa các bước mà không lo bị rơi mất khi chuyển giao diện.
+#### 1. Từ Danh sách phim sang Chi tiết phim (`parseMovieDetail`)
+Khi `parseListResponse()` hoặc `parseSearchResponse()` trả về item có `datasend` (hoặc `id` dạng `slug|data:...`), App tự động trích xuất chuỗi data này và truyền thẳng vào tham số thứ 3 của hàm `parseMovieDetail(html, apiUrl, datasend)` và tham số thứ 2 của `getUrlDetail(slug, datasend)`.
 
-### Cách bóc data trong hàm parse
+---
+
+#### ⚡ Kỹ Thuật: Bỏ Qua Fetch Lại Chi Tiết Phim Khi List Đã Có Sẵn Dữ Liệu (Tải Tức Thì 0ms)
+
+Nếu API danh sách phim của bạn đã trả về đầy đủ thông tin chi tiết (hoặc bạn đã có sẵn link video / danh sách tập), bạn có thể **bỏ qua hoàn toàn bước gọi HTTP tải HTML chi tiết**:
+
+##### Cách 1: `getUrlDetail(slug, datasend)` trả về trực tiếp chuỗi JSON của `MovieDetail` ⭐ (Khuyên Dùng)
+Khi `getUrlDetail` trả về chuỗi JSON object (bắt đầu bằng `{` và kết thúc bằng `}`), App sẽ **bỏ qua 100% việc gửi HTTP request** và nạp thẳng `MovieDetail` vào màn hình chi tiết:
+
+```javascript
+// 1. Ở parseListResponse: Đóng gói dữ liệu phim vào datasend
+function parseListResponse(html, apiUrl) {
+    var movies = [];
+    // ... lặp qua các item ...
+    movies.push({
+        id: item.slug,
+        title: item.title,
+        posterUrl: item.poster,
+        datasend: JSON.stringify({
+            id: item.slug,
+            title: item.title,
+            posterUrl: item.poster,
+            description: item.description,
+            servers: [{
+                name: "VIP",
+                episodes: [{ name: "Full", slug: "full", id: item.streamUrl }]
+            }]
+        })
+    });
+    return JSON.stringify({ items: movies, pagination: { currentPage: 1, totalPages: 1 } });
+}
+
+// 2. Ở getUrlDetail: Trả về thẳng datasend (App sẽ bỏ qua fetch HTTP)
+function getUrlDetail(slug, datasend) {
+    if (datasend) {
+        return datasend; // Trả về chuỗi JSON MovieDetail trực tiếp!
+    }
+    return "https://site.com/phim/" + slug;
+}
+```
+
+##### Cách 2: `getUrlDetail(slug, datasend)` trả về chuỗi rỗng `""`
+Khi `getUrlDetail` trả về `""`, App sẽ không gọi HTTP mà gọi thẳng `parseMovieDetail("", "", datasend)`:
+
+```javascript
+function getUrlDetail(slug, datasend) {
+    return ""; // Trả về rỗng -> App không fetch HTTP
+}
+
+function parseMovieDetail(html, apiUrl, datasend) {
+    var detail = JSON.parse(datasend || "{}");
+    return JSON.stringify({
+        id: detail.id,
+        title: detail.title,
+        posterUrl: detail.posterUrl,
+        servers: detail.servers || []
+    });
+}
+```
+
+---
+
+#### 2. Từ Chi tiết phim sang Phát video (`getStreamLink` / `parseDetailResponse`)
+Tương tự, nếu từng tập phim trong mảng `episodes` có `datasend` (hoặc `id` dạng `ep-1|data:...`), App bảo toàn và truyền chuỗi này vào:
+- `getStreamLink(episodeId, datasend)`
+- `parseDetailResponse(html, apiUrl, datasend)`
+
+Giúp dev plugin truyền nguyên vẹn các token mã hóa, key giải mã hoặc tham số riêng giữa các bước mà không lo bị rơi mất khi chuyển giao diện.
+
+---
+
+#### 🛡️ Cơ Chế Tự Động Làm Sạch URL của App
+- Khi plugin trả về URL hoặc ID có chứa `|data:...` (hoặc `datasend`), App **luôn tự động cắt bỏ phần `|data:...` trước khi gửi HTTP request lên server**, đảm bảo URL fetch luôn là URL sạch (`https://site.com/path`).
+- Server của trang web sẽ **không bao giờ nhận chuỗi `|datasend`**, tránh triệt để lỗi `400 Bad Request` hoặc `404 Not Found`.
+- Chuỗi data thô được bảo toàn nguyên vẹn và truyền vào tham số `datasend` của các hàm parse.
+
+### Cách bóc data trong hàm parse (Helper)
 
 ```javascript
 // Helper nhỏ gọn — dùng chung cho mọi plugin
@@ -233,22 +298,23 @@ function getPipeData(apiUrl) {
     return s;
 }
 
-function parseMovieDetail(html, apiUrl) {
-    var token = getPipeData(apiUrl);   // "encodeData"
-    var cleanUrl = apiUrl.split("|")[0];
-    console.log("token =", token);
+function parseMovieDetail(html, apiUrl, datasend) {
+    // Ưu tiên đọc từ datasend trực tiếp (tham số thứ 3)
+    var data = datasend || getPipeData(apiUrl);
+    console.log("data nhận được:", data);
     // ...
 }
 ```
 
 > 💡 Hàm tương ứng bên App là `extractPluginPipeData()` trong `PluginExecutor.kt` — logic giống hệt helper trên.
 
-### ✅ Checklist khi dùng dấu `|`
+### ✅ Checklist khi dùng dấu `|` & `datasend`
 
-- [ ] Dữ liệu riêng của plugin → **luôn** viết `|data:...`
+- [ ] Dữ liệu riêng của plugin dạng chuỗi/JSON → gán vào trường `datasend` hoặc viết `|data:...`
+- [ ] Muốn bỏ qua fetch HTTP chi tiết phim → `getUrlDetail(slug, datasend)` trả về chuỗi JSON `MovieDetail` trực tiếp hoặc trả về `""`
 - [ ] Header HTTP thật → viết `|Key=Value&Key2=Value2` (KHÔNG có `data:`)
 - [ ] Không trộn lẫn: một URL chỉ nên có **một** dấu `|` đầu tiên mang ý nghĩa; ký tự `|` sau đó thuộc về phần data
-- [ ] Muốn truyền Object lớn → `encodeURIComponent(JSON.stringify(obj))` rồi ghép: `"|data:" + encoded`
+- [ ] Muốn truyền Object lớn qua URL string → `encodeURIComponent(JSON.stringify(obj))` rồi ghép: `"|data:" + encoded`
 
 ---
 
