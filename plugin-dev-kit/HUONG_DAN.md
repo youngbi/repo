@@ -1347,22 +1347,111 @@ return JSON.stringify({
 
 ---
 
-### 🔐 Giải Mã M3U8 AES-GCM Tự Động Trong ExoPlayer (`m3u8Key` / `X-M3u8-Key`)
+## 📺 Cấu Hình Đặc Thù Cho Plugin IPTV & Mã Hóa DRM (ClearKey / Widevine)
 
-Đối với các nguồn phim (như Rophim, HDHub, SuperMV...) mã hóa playlist M3U8 bằng `#ENC-AESGCM`:
+### 📑 Mục Lục Phần Này
+- [1. Đặc điểm của Plugin IPTV trong App](#1-đặc-điểm-của-plugin-iptv-trong-app)
+- [2. Khai báo Manifest cho IPTV](#2-khai-báo-manifest-cho-iptv)
+- [3. Luồng phát Kênh trực tiếp HLS (.m3u8) / MP4](#3-luồng-phát-kênh-trực-tiếp-hls-m3u8--mp4)
+- [4. Cấu hình ClearKey DRM (DASH .mpd kèm KID + KEY)](#4-cấu-hình-clearkey-drm-dash-mpd-kèm-kid--key)
+- [5. Cấu hình Widevine DRM (DASH .mpd kèm License URL)](#5-cấu-hình-widevine-drm-dash-mpd-kèm-license-url)
+- [6. Giải Mã M3U8 AES-GCM Tự Động (`m3u8Key` / `X-M3u8-Key`)](#6-giải-mã-m3u8-aes-gcm-tự-động-m3u8key--x-m3u8-key)
+
+---
+
+### <a id="1-đặc-điểm-của-plugin-iptv-trong-app"></a>1. Đặc điểm của Plugin IPTV trong App:
+- Khi người dùng bấm chọn kênh từ danh sách, App sẽ **bỏ qua giao diện chi tiết (Detail Screen)** và giải mã link stream để **phát trực tiếp ngay lập tức** bằng ExoPlayer.
+- Hỗ trợ đầy đủ các nguồn trực tiếp: HLS (`.m3u8`), DASH (`.mpd`), MP4, **ClearKey DRM**, **Widevine DRM**, và giải mã **M3U8 AES-GCM**.
+
+---
+
+### <a id="2-khai-báo-manifest-cho-iptv"></a>2. Khai báo Manifest cho IPTV:
+```javascript
+function getManifest() {
+    return JSON.stringify({
+        "id": "onsports_tv",
+        "name": "Kênh Truyền Hình Thể Thao",
+        "version": "1.0.0",
+        "baseUrl": "https://onsports.vn",
+        "type": "IPTV",             // ⭐ Bắt buộc: Đánh dấu plugin loại IPTV
+        "playerType": "exoplayer"   // Khuyến nghị dùng exoplayer
+    });
+}
+```
+
+---
+
+### <a id="3-luồng-phát-kênh-trực-tiếp-hls-m3u8--mp4"></a>3. Luồng phát Kênh trực tiếp HLS (.m3u8) / MP4:
+Trả về luồng trong `parseDetailResponse()`:
+```javascript
+function parseDetailResponse(html, url) {
+    return JSON.stringify({
+        "url": "https://live.example.com/vtvcab1/index.m3u8",
+        "mimeType": "application/x-mpegURL",
+        "headers": {
+            "User-Agent": "Mozilla/5.0 ...",
+            "Referer": "https://example.com/"
+        }
+    });
+}
+```
+
+---
+
+### <a id="4-cấu-hình-clearkey-drm-dash-mpd-kèm-kid--key"></a>4. Cấu hình ClearKey DRM (DASH .mpd kèm KID + KEY):
+Dành cho các luồng DASH yêu cầu giải mã bản quyền ClearKey DRM:
+```javascript
+function parseDetailResponse(html, url) {
+    return JSON.stringify({
+        "url": "https://live.example.com/channel/manifest.mpd",
+        "mimeType": "application/dash+xml",
+        "drmType": "clearkey",
+        "drmKid": "c410ddc6a75244639fd0561fba5ef19b",
+        "drmKey": "30d13ea42031b9ff8271e5dc37d90e10",
+        "headers": {
+            "User-Agent": "Mozilla/5.0 ...",
+            "Referer": "https://example.com/"
+        }
+    });
+}
+```
+
+---
+
+### <a id="5-cấu-hình-widevine-drm-dash-mpd-kèm-license-url"></a>5. Cấu hình Widevine DRM (DASH .mpd kèm License URL):
+Dành cho các kênh truyền hình bảo vệ bởi Widevine DRM:
+```javascript
+function parseDetailResponse(html, url) {
+    return JSON.stringify({
+        "url": "https://s7485.cdn.mytvnet.vn/pkg20/__cl/gvtsig/vstv451/manifest.mpd",
+        "mimeType": "application/dash+xml",
+        "drmType": "widevine",
+        "licenseUrl": "https://tv.vietanhtv.top/mytv2/key.php",
+        "drmHeaders": {
+            "User-Agent": "Dalvik/2.1.0 (Linux; U; Android...)"
+        }
+    });
+}
+```
+
+---
+
+### <a id="6-giải-mã-m3u8-aes-gcm-tự-động-m3u8key--x-m3u8-key"></a>6. Giải Mã M3U8 AES-GCM Tự Động (`m3u8Key` / `X-M3u8-Key`):
+
+Đối với các luồng M3U8 mã hóa bằng `#ENC-AESGCM`:
 ```text
 #ENC-AESGCM;iv=...
 #EXT-X-B65
 <BASE64_PAYLOAD>
 ```
 
-App hỗ trợ tự động giải mã trực tiếp trong ExoPlayer (100% Native, không cần Cloudflare Worker). Plugin có thể chỉ định khóa giải mã tùy ý theo 2 cách:
+App hỗ trợ tự động giải mã trực tiếp trong ExoPlayer (100% Native). Plugin có thể chỉ định khóa giải mã theo 2 cách:
 
 #### Cách 1: Khai báo trường `m3u8Key` trong JSON trả về
 ```javascript
 return JSON.stringify({
     "url": "https://cdn.example.com/playlist.m3u8",
-    "m3u8Key": "your_secret_aes_key_here", // Khóa AES-GCM của nguồn phim
+    "m3u8Key": "your_secret_aes_key_here", // Khóa AES-GCM của nguồn phim / kênh
     "headers": {
         "Referer": "https://cdn.example.com/",
         "Origin": "https://cdn.example.com"
@@ -1380,63 +1469,6 @@ return JSON.stringify({
         "X-M3u8-Key": "your_secret_aes_key_here"
     }
 });
-```
-
----
-
-### 📺 Hướng Dẫn Viết Plugin Truyền Hình / IPTV (`"type": "IPTV"`)
-
-Khi bạn viết plugin cho các nguồn kênh truyền hình trực tiếp (Live TV / IPTV), khai báo `"type": "IPTV"` giúp tối ưu hóa luồng xem cho người dùng.
-
-#### Đặc điểm của Plugin IPTV trong App:
-- Khi người dùng bấm chọn kênh từ danh sách, App sẽ **bỏ qua giao diện chi tiết (Detail Screen)** và giải mã link stream để **phát trực tiếp ngay lập tức** bằng ExoPlayer.
-- Hỗ trợ đầy đủ các nguồn trực tiếp: HLS (`.m3u8`), DASH (`.mpd`), MP4, và mã hóa bản quyền **ClearKey DRM**.
-
-#### 1. Khai báo Manifest:
-```javascript
-function getManifest() {
-    return JSON.stringify({
-        "id": "onsports_tv",
-        "name": "Kênh Truyền Hình Thể Thao",
-        "version": "1.0.0",
-        "baseUrl": "https://onsports.vn",
-        "type": "IPTV",             // ⭐ Đánh dấu plugin loại IPTV
-        "playerType": "exoplayer"   // Khuyến nghị dùng exoplayer
-    });
-}
-```
-
-#### 2. Trả về luồng phát Kênh trực tiếp trong `parseDetailResponse()`:
-
-- **Dạng HLS (.m3u8) / MP4 thông thường**:
-```javascript
-function parseDetailResponse(html, url) {
-    return JSON.stringify({
-        "url": "https://live.example.com/vtvcab1/index.m3u8",
-        "mimeType": "application/x-mpegURL",
-        "headers": {
-            "User-Agent": "Mozilla/5.0 ...",
-            "Referer": "https://example.com/"
-        }
-    });
-}
-```
-
-- **Dạng DASH (.mpd) kèm ClearKey DRM**:
-```javascript
-function parseDetailResponse(html, url) {
-    return JSON.stringify({
-        "url": "https://live.example.com/channel/manifest.mpd",
-        "mimeType": "application/dash+xml",
-        "drmType": "clearkey",
-        "drmKid": "c410ddc6a75244639fd0561fba5ef19b",
-        "drmKey": "30d13ea42031b9ff8271e5dc37d90e10",
-        "headers": {
-            "User-Agent": "Mozilla/5.0 ...",
-            "Referer": "https://example.com/"
-        }
-    });
-}
 ```
 
 ---
