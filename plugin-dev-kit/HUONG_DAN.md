@@ -583,21 +583,22 @@ Lưu ý về header:
 
 ---
 
-### `parseListResponse()` — Danh sách phim
+### `parseListResponse()` — Danh sách phim & Thư mục lồng nhau
 
 ```json
 {
     "items": [
         {
-            "id": "slug-phim",
-            "title": "Tên Phim",
+            "id": "slug-phim-hoac-slug-danh-muc",
+            "title": "Tên Phim hoặc Tên Diễn Viên / Thể Loại",
             "posterUrl": "https://img.../poster.jpg",
             "backdropUrl": "https://img.../backdrop.jpg",
-            "description": "Mô tả ngắn",
+            "description": "Mô tả ngắn hoặc thời lượng",
             "year": 2024,
             "quality": "FHD",
             "episode_current": "Tập 10/12",
-            "lang": "Vietsub"
+            "lang": "Vietsub",
+            "previewUrl": "https://.../preview.mp4"
         }
     ],
     "pagination": {
@@ -607,6 +608,104 @@ Lưu ý về header:
         "itemsPerPage": 20
     }
 }
+```
+
+---
+
+#### 📁 Cơ Chế Lồng Thư Mục (Nested Categories & Drill-down) cho Thể Loại & Diễn Viên
+
+Trong App, một màn hình danh sách (`CategoryScreen`) có thể đóng vai trò là **Danh sách Phim**, **Danh sách Thể Loại**, hoặc **Danh sách Diễn Viên**. 
+
+App điều khiển giao diện và hành vi điều hướng (mở phim hay mở tiếp thư mục con) thông qua thuộc tính **`quality`** của từng item trong mảng `items`:
+
+| Giá trị `quality` | Giao diện hiển thị trên App | Hành vi khi người dùng Bấm (Click) |
+| :--- | :--- | :--- |
+| **`"CAT"`** | **Category Grid** (Thẻ chữ nhật màu sắc nổi bật) | **Mở tiếp thư mục con**: App gọi `CategoryScreen` với slug `item.id` (Drill-down) |
+| **`"ACTRESS"`** | **Photo Grid** (Lưới thẻ ảnh avatar diễn viên) | **Mở danh sách phim của diễn viên**: App gọi `CategoryScreen` với slug `item.id` |
+| **`"HD"`, `"FHD"`, `"CAM"`, v.v.** | **Movie Card** (Poster phim tiêu chuẩn) | **Mở màn hình chi tiết phim** (`DetailScreen` / `detail/{id}`) |
+| **`"INFO"`** | **Thông báo / Hướng dẫn** (Dùng khi báo lỗi hoặc trang tìm kiếm động) | Không mở phim |
+
+---
+
+#### 💡 Cơ Chế Nhận Diện Trang Trong Plugin (Linh Hoạt & Không Bắt Buộc Từ Khóa Cố Định)
+
+> ❓ **Câu hỏi thường gặp:** *"Plugin có bắt buộc link phải chứa chữ `actresses` hay `genres` không?"*
+> 
+> 👉 **Trả lời: KHÔNG BẮT BUỘC!** App chỉ quan tâm plugin trả về `quality: "CAT"` hay `quality: "ACTRESS"`. Tùy theo từng website, bạn có thể nhận diện loại trang bằng 1 trong 3 cách linh hoạt sau:
+
+##### Cách 1: Nhận diện qua tham số `apiUrl` (Khuyên dùng & Đơn giản nhất)
+App luôn truyền URL đang fetch vào tham số thứ 2 của `parseListResponse(html, apiUrl, datasend)`:
+```javascript
+function parseListResponse(html, apiUrl, datasend) {
+    var movies = [];
+
+    // Kiểm tra URL theo website của bạn (/dien-vien, /actors, /the-loai, /category, /tags,...)
+    var isActressPage = apiUrl.indexOf('/dien-vien') !== -1 || apiUrl.indexOf('/actors') !== -1;
+    var isGenrePage = apiUrl.indexOf('/the-loai') !== -1 || apiUrl.indexOf('/categories') !== -1;
+
+    if (isActressPage) {
+        // Parse danh sách Diễn viên
+        // Gán quality: "ACTRESS"
+        movies.push({
+            id: "/dien-vien/ninh-duong-lan-ngoc",
+            title: "Ninh Dương Lan Ngọc",
+            posterUrl: "https://.../avatar.jpg",
+            quality: "ACTRESS" // App sẽ mở tiếp danh sách phim khi click
+        });
+    } else if (isGenrePage) {
+        // Parse danh sách Thể loại
+        // Gán quality: "CAT"
+        movies.push({
+            id: "/the-loai/kinh-di",
+            title: "Kinh Dị",
+            quality: "CAT" // App sẽ hiện thẻ màu và mở tiếp khi click
+        });
+    } else {
+        // Parse danh sách Phim bình thường
+        movies.push({
+            id: "lat-mat-7",
+            title: "Lật Mặt 7",
+            posterUrl: "https://.../poster.jpg",
+            quality: "HD" // App sẽ mở chi tiết phim khi click
+        });
+    }
+
+    return JSON.stringify({
+        items: movies,
+        pagination: { currentPage: 1, totalPages: 10, totalItems: movies.length, itemsPerPage: 20 }
+    });
+}
+```
+
+##### Cách 2: Gắn nhãn chủ động bằng `datasend` (Dấu Pipe `|`)
+Bạn có thể tự gắn nhãn cho các mục menu trong `getPrimaryCategories()`:
+```javascript
+function getPrimaryCategories() {
+    return JSON.stringify([
+        { name: 'Diễn viên', slug: 'danh-sach-dien-vien|data:type=actress' },
+        { name: 'Thể loại', slug: 'danh-sach-the-loai|data:type=genre' },
+        { name: 'Mới cập nhật', slug: 'phim-moi|data:type=movie' }
+    ]);
+}
+
+function parseListResponse(html, apiUrl, datasend) {
+    var movies = [];
+    if (datasend === "type=actress") {
+        // Xử lý danh sách diễn viên -> quality: "ACTRESS"
+    } else if (datasend === "type=genre") {
+        // Xử lý danh sách thể loại -> quality: "CAT"
+    } else {
+        // Xử lý danh sách phim thông thường -> quality: "HD"
+    }
+    return JSON.stringify({ items: movies, pagination: { currentPage: 1, totalPages: 1 } });
+}
+```
+
+##### Cách 3: Nhận diện theo Class / Thẻ DOM đặc trưng của Website
+Nếu URL không có dấu hiệu phân biệt rõ ràng, hãy kiểm tra CSS class của website đó:
+```javascript
+var isActressPage = html.indexOf('class="actor-card"') !== -1 || html.indexOf('class="cast-list"') !== -1;
+var isGenrePage = html.indexOf('class="genre-box"') !== -1 || html.indexOf('class="category-items"') !== -1;
 ```
 
 ---
@@ -635,13 +734,45 @@ Lưu ý về header:
     "quality": "FHD",
     "year": 2024,
     "rating": 8.5,
-    "casts": "Diễn viên A, B",
+    "casts": "[Diễn viên A](/dien-vien/a), [Diễn viên B](/dien-vien/b)",
     "director": "Đạo diễn C",
-    "category": "Hành Động, Phiêu Lưu",
+    "category": "[Hành Động](/the-loai/hanh-dong), [Phiêu Lưu](/the-loai/phieu-luu)",
     "status": "Full",
-    "duration": "120 Phút"
+    "duration": "120 Phút",
+    "previewUrl": "https://.../preview.mp4"
 }
 ```
+
+---
+
+#### 🔗 Định Dạng Liên Kết Markdown trong Trang Chi Tiết (`casts`, `category`, `director`, `status`)
+
+App hỗ trợ tự động bóc tách **Markdown Links** `[Tên Hiển Thị](slug_hoặc_url)` trong các trường thông tin:
+- **`casts`** (Diễn viên)
+- **`category`** (Thể loại)
+- **`director`** (Đạo diễn)
+- **`status`** (Trạng thái / Nhãn / Studio)
+
+##### Cách viết trong plugin:
+```javascript
+function parseMovieDetail(html, apiUrl, datasend) {
+    // ... bóc tách dữ liệu ...
+    return JSON.stringify({
+        id: "snos-056",
+        title: "Tên Phim",
+        posterUrl: "https://.../cover.jpg",
+        // Định dạng [Tên](slug_hoặc_path)
+        casts: "[Yua Mikami](/vi/actresses/yua-mikami), [Eimi Fukada](/vi/actresses/eimi-fukada)",
+        category: "[Không Che](/vi/genres/uncensored), [VR](/vi/genres/vr)",
+        director: "[Tên Đạo Diễn](/director/abc)",
+        servers: [ ... ]
+    });
+}
+```
+
+👉 **Lợi ích:** Trên giao diện Chi tiết phim của App, các mục này sẽ hiển thị dạng link gạch chân có màu. Khi người dùng **bấm vào tên Diễn viên hoặc Thể loại**, App sẽ tự động mở màn hình `CategoryScreen` tương ứng với slug đó!
+
+---
 
 **🔑 Về `episode.id`:**
 - Nếu là link `.m3u8`/`.mp4` trực tiếp → App phát luôn, KHÔNG gọi `parseDetailResponse`
