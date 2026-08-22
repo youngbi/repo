@@ -1347,6 +1347,44 @@ return JSON.stringify({
 
 ---
 
+### 🔐 Giải Mã M3U8 AES-GCM Tự Động Trong ExoPlayer (`m3u8Key` / `X-M3u8-Key`)
+
+Đối với các nguồn phim (như Rophim, HDHub, SuperMV...) mã hóa playlist M3U8 bằng `#ENC-AESGCM`:
+```text
+#ENC-AESGCM;iv=...
+#EXT-X-B65
+<BASE64_PAYLOAD>
+```
+
+App hỗ trợ tự động giải mã trực tiếp trong ExoPlayer (100% Native, không cần Cloudflare Worker). Plugin có thể chỉ định khóa giải mã tùy ý theo 2 cách:
+
+#### Cách 1: Khai báo trường `m3u8Key` trong JSON trả về
+```javascript
+return JSON.stringify({
+    "url": "https://cdn.example.com/playlist.m3u8",
+    "m3u8Key": "TriDuc-TuyetMat-KhongThePha-2026", // Khóa AES-GCM của nguồn phim
+    "headers": {
+        "Referer": "https://www.rophim.ad/",
+        "Origin": "https://www.rophim.ad"
+    }
+});
+```
+
+#### Cách 2: Khai báo trong `headers` (`X-M3u8-Key` hoặc `M3u8-Key`)
+```javascript
+return JSON.stringify({
+    "url": "https://cdn.example.com/playlist.m3u8",
+    "headers": {
+        "Referer": "https://www.rophim.ad/",
+        "Origin": "https://www.rophim.ad",
+        "X-M3u8-Key": "TriDuc-TuyetMat-KhongThePha-2026"
+    }
+});
+```
+*(Nếu không khai báo, App sẽ tự động dùng khóa mặc định `"TriDuc-TuyetMat-KhongThePha-2026"`).*
+
+---
+
 ### 📺 Hướng Dẫn Viết Plugin Truyền Hình / IPTV (`"type": "IPTV"`)
 
 Khi bạn viết plugin cho các nguồn kênh truyền hình trực tiếp (Live TV / IPTV), khai báo `"type": "IPTV"` giúp tối ưu hóa luồng xem cho người dùng.
