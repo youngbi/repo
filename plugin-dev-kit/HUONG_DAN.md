@@ -1362,10 +1362,10 @@ App hỗ trợ tự động giải mã trực tiếp trong ExoPlayer (100% Nativ
 ```javascript
 return JSON.stringify({
     "url": "https://cdn.example.com/playlist.m3u8",
-    "m3u8Key": "TriDuc-TuyetMat-KhongThePha-2026", // Khóa AES-GCM của nguồn phim
+    "m3u8Key": "your_secret_aes_key_here", // Khóa AES-GCM của nguồn phim
     "headers": {
-        "Referer": "https://www.rophim.ad/",
-        "Origin": "https://www.rophim.ad"
+        "Referer": "https://cdn.example.com/",
+        "Origin": "https://cdn.example.com"
     }
 });
 ```
@@ -1375,13 +1375,12 @@ return JSON.stringify({
 return JSON.stringify({
     "url": "https://cdn.example.com/playlist.m3u8",
     "headers": {
-        "Referer": "https://www.rophim.ad/",
-        "Origin": "https://www.rophim.ad",
-        "X-M3u8-Key": "TriDuc-TuyetMat-KhongThePha-2026"
+        "Referer": "https://cdn.example.com/",
+        "Origin": "https://cdn.example.com",
+        "X-M3u8-Key": "your_secret_aes_key_here"
     }
 });
 ```
-*(Nếu không khai báo, App sẽ tự động dùng khóa mặc định `"TriDuc-TuyetMat-KhongThePha-2026"`).*
 
 ---
 
