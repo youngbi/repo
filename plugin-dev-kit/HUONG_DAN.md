@@ -1692,8 +1692,7 @@ while ((match = regex.exec(html)) !== null) {
 
 ### QuickJS sandbox — Những thứ KHÔNG dùng được:
 ❌ `document.querySelector()`,  `window.location`, `DOM API`
-❌ `fetch()`, `XMLHttpRequest`, `async/await`
-❌ `require()`, `import`
+❌ `require()`, `import` (Toàn bộ logic viết trong 1 file JS)
 
 ### Những thứ DÙNG ĐƯỢC:
 ✅ `JSON.parse()`, `JSON.stringify()`
@@ -1702,7 +1701,76 @@ while ((match = regex.exec(html)) !== null) {
 ✅ `Array.map()`, `Array.filter()`, `Array.forEach()`
 ✅ `try {} catch(e) {}`
 ✅ `encodeURIComponent()`, `decodeURIComponent()`
-✅ `localStorage.getItem/setItem/removeItem`
+✅ `localStorage.getItem / setItem / removeItem / clear`
+✅ `getSetCookies(url, options)` — Lấy danh sách `Set-Cookie` mảng từ Server
+✅ `getSetCookie(url, options)` — Lấy chuỗi `Set-Cookie` gộp từ Server
+✅ `getResponseHeaders(url, options)` — Lấy toàn bộ Response Headers từ Server
+✅ `httpRequest(url, options)` — Gọi HTTP GET/POST/HEAD đồng bộ
+✅ `getCookie(url)` — Đọc cookie đã lưu trong CookieManager của App
+✅ `toast(message)` — Hiển thị Toast thông báo
+✅ `console.log / warn / error / info / print` — In log ra Console của App
+✅ `AppCrypto.decryptAesGcm / decodeHex / encodeHex` — Giải mã và mã hóa dữ liệu
+
+---
+
+## 🌐 Chi Tiết Native Bridge APIs (HTTP & Cookies Server)
+
+### 1. `getSetCookies(url, options)`
+Gửi request đồng bộ đến máy chủ và trả về **mảng (`Array<string>`)** chứa tất cả các header `Set-Cookie` mà server phản hồi.
+
+```javascript
+// Gọi GET cơ bản
+var cookies = getSetCookies("https://domain-cua-trang.com");
+console.log("Danh sách Set-Cookie:", JSON.stringify(cookies));
+// Output: ["session=abc123xyz; Path=/; Secure; HttpOnly", "guest_id=987; Path=/"]
+
+// Gọi kèm custom headers
+var cookies = getSetCookies("https://domain-cua-trang.com", {
+    "User-Agent": "Mozilla/5.0...",
+    "Referer": "https://domain-cua-trang.com"
+});
+```
+
+### 2. `getSetCookie(url, options)`
+Gộp các cookie server trả về thành **một chuỗi đơn** cách nhau bằng `; `.
+
+```javascript
+var cookieStr = getSetCookie("https://domain-cua-trang.com");
+console.log("Cookie server:", cookieStr);
+toast("Cookie: " + cookieStr);
+```
+
+### 3. `getResponseHeaders(url, options)`
+Trả về một **Object chứa toàn bộ Response Headers** do server trả về:
+
+```javascript
+var headers = getResponseHeaders("https://domain-cua-trang.com");
+
+console.log("HTTP Status:", headers.status);
+console.log("Content-Type:", headers["content-type"]);
+console.log("Location:", headers["location"]);
+console.log("Set-Cookie:", JSON.stringify(headers["set-cookie"]));
+```
+
+### 4. `httpRequest(url, options)`
+Thực hiện HTTP request đồng bộ (hỗ trợ `GET`, `POST`, `HEAD`, `PUT`, `DELETE`), trả về `{ status, isSuccessful, url, headers, setCookies, body }`:
+
+```javascript
+var res = httpRequest("https://domain-cua-trang.com/api/login", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0..."
+    },
+    body: "username=my_user&password=my_password"
+});
+
+if (res && res.isSuccessful) {
+    console.log("Mã phản hồi:", res.status);
+    console.log("Cookies nhận được:", JSON.stringify(res.setCookies));
+    console.log("Nội dung body:", res.body);
+}
+```
 
 ---
 
