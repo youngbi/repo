@@ -75,23 +75,23 @@ function getUrlYears() { return ""; }
  */
 function parseListResponse(html, url) {
     try {
-        // Ví dụ: Nếu trang có API trả JSON
-        // var data = JSON.parse(html);
-        // var items = data.items.map(function(item) {
-        //     return { id: item.slug, title: item.title, posterUrl: item.thumb };
-        // });
-        
-        // Ví dụ: Nếu trang trả HTML → dùng Regex
+        // Cách 1: Dùng MiniJQ (_$) có sẵn trong App (Cực kỳ tiện lợi & khuyên dùng):
+        var $doc = _$(html);
         var items = [];
-        var regex = /<a[^>]*href="\/phim\/([^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[\s\S]*?<h3>([^<]+)/g;
-        var match;
-        while ((match = regex.exec(html)) !== null) {
+        $doc.find(".film-item").each(function() {
             items.push({
-                id: match[1],
-                title: match[3].trim(),
-                posterUrl: match[2]
+                id: this.find("a").attr("href"),
+                title: this.find(".title").text().trim(),
+                posterUrl: this.find("img").attr("data-src") || this.find("img").attr("src")
             });
-        }
+        });
+        
+        // Cách 2: Nếu dùng Regex truyền thống:
+        // var regex = /<a[^>]*href="\/phim\/([^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[\s\S]*?<h3>([^<]+)/g;
+        // var match;
+        // while ((match = regex.exec(html)) !== null) {
+        //     items.push({ id: match[1], title: match[3].trim(), posterUrl: match[2] });
+        // }
         
         return JSON.stringify({
             items: items,

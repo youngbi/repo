@@ -91,6 +91,100 @@
     </div>
 
     <script>
+        // =========================================================================
+        // BUILT-IN LIBRARIES MOCK FOR TESTER (Tương đương môi trường QuickJS của App)
+        // =========================================================================
+        function getparam(url, param) {
+            try {
+                if (!url || !param) return "";
+                var clean = url.split("|")[0];
+                var qIdx = clean.indexOf("?");
+                if (qIdx === -1) return "";
+                var qs = clean.substring(qIdx + 1);
+                var pairs = qs.split("&");
+                for (var i = 0; i < pairs.length; i++) {
+                    var p = pairs[i].split("=");
+                    if (decodeURIComponent(p[0]) === param) {
+                        return p.length > 1 ? decodeURIComponent(p.slice(1).join("=")) : "";
+                    }
+                }
+                return "";
+            } catch (e) {
+                return "";
+            }
+        }
+
+        var BASE64 = {
+            encode: function(str) {
+                try {
+                    return btoa(unescape(encodeURIComponent(str)));
+                } catch(e) {
+                    return "";
+                }
+            },
+            decode: function(str) {
+                try {
+                    var clean = str.replace(/-/g, "+").replace(/_/g, "/");
+                    while (clean.length % 4) clean += "=";
+                    return decodeURIComponent(escape(atob(clean)));
+                } catch(e) {
+                    return "";
+                }
+            }
+        };
+
+        function decodeHTMLtext(str) {
+            try {
+                if (!str) return "";
+                return str.replace(/&#(\d+);|&#x([0-9a-fA-F]+);/g, function(match, dec, hex) {
+                    if (dec) return String.fromCharCode(parseInt(dec, 10));
+                    if (hex) return String.fromCharCode(parseInt(hex, 16));
+                    return match;
+                }).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+            } catch (e) {
+                return str;
+            }
+        }
+
+        // Tích hợp MiniJQ (_$) đơn giản cho trình duyệt
+        function _$(param) {
+            if (!param) return { find: () => ({ each: () => {}, text: () => "", attr: () => "" }), text: () => "", attr: () => "" };
+            if (typeof param === "string") {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(param, "text/html");
+                return wrapElement(doc.body);
+            }
+            return wrapElement(param);
+        }
+
+        function wrapElement(el) {
+            return {
+                find: function(sel) {
+                    try {
+                        const cleanSel = sel.replace(/:content\([^)]+\)/gi, "");
+                        const nodes = el.querySelectorAll(cleanSel || "*");
+                        return {
+                            length: nodes.length,
+                            each: function(cb) {
+                                nodes.forEach((n, idx) => cb.call(wrapElement(n), idx, wrapElement(n)));
+                            },
+                            text: function() { return nodes[0] ? nodes[0].textContent.trim() : ""; },
+                            html: function() { return nodes[0] ? nodes[0].innerHTML : ""; },
+                            attr: function(name) { return nodes[0] ? (nodes[0].getAttribute(name) || "") : ""; },
+                            first: function() { return nodes[0] ? wrapElement(nodes[0]) : wrapElement(null); },
+                            last: function() { return nodes[nodes.length - 1] ? wrapElement(nodes[nodes.length - 1]) : wrapElement(null); },
+                            eq: function(i) { return nodes[i] ? wrapElement(nodes[i]) : wrapElement(null); }
+                        };
+                    } catch(e) {
+                        return { each: () => {}, text: () => "", attr: () => "", length: 0 };
+                    }
+                },
+                text: function() { return el ? el.textContent.trim() : ""; },
+                html: function() { return el ? el.innerHTML : ""; },
+                attr: function(name) { return el ? (el.getAttribute(name) || "") : ""; }
+            };
+        }
+
         // Load JS file
         document.getElementById('pluginFile').addEventListener('change', function (e) {
             const file = e.target.files[0];

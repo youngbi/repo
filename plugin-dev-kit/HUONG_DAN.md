@@ -1767,10 +1767,125 @@ var res = httpRequest("https://domain-cua-trang.com/api/login", {
 
 if (res && res.isSuccessful) {
     console.log("Mã phản hồi:", res.status);
-    console.log("Cookies nhận được:", JSON.stringify(res.setCookies));
-    console.log("Nội dung body:", res.body);
+## 🧰 Thư Viện Tích Hợp Sẵn Trong QuickJS Engine (Built-in JS Libraries) ⭐ (Mới)
+
+Kể từ các phiên bản mới, **VAAPP đã tích hợp sẵn toàn bộ các thư viện phổ biến vào môi trường JavaScript QuickJS**. Nhà phát triển plugin **KHÔNG CẦN** phải copy-paste hàng trăm dòng thư viện (như MiniJQ `_$`, Base64, CryptoJS Decrypt) vào cuối file JS nữa, giúp mã nguồn plugin siêu tinh gọn, sáng sủa và chạy với hiệu năng native cực nhanh.
+
+---
+
+### 1. `_$(htmlString)` — MiniJQ Engine Phân Tích HTML DOM
+
+Cung cấp sẵn bộ phân tích DOM dạng jQuery rút gọn, hỗ trợ đầy đủ các thao tác tìm kiếm và trích xuất dữ liệu:
+
+* **Khởi tạo:** `var $doc = _$(html);`
+* **Tìm kiếm Selector:**
+  * `$doc.find(".movie-item")` — Tìm theo Class
+  * `$doc.find("#player")` — Tìm theo ID
+  * `$doc.find("a[href*='tap-']")` — Tìm theo Thuộc tính
+  * `$doc.find("li:content('Thể|loại:')")` — Tìm thẻ chứa từ khóa bất kỳ
+  * `$doc.find("div:first")` / `$doc.find("div:last")` / `$doc.find("div:eq(2)")`
+* **Trích xuất dữ liệu:**
+  * `.text()` — Lấy toàn bộ văn bản bên trong
+  * `.html()` — Lấy mã HTML bên trong
+  * `.attr("href")` / `.attr("src")` / `.attr("data-src")` — Lấy thuộc tính
+  * `.each(function(index, item) { ... })` — Lặp qua từng phần tử (trong callback `this` là đối tượng `MiniJQ` của phần tử hiện tại)
+* **Duyệt cây DOM:**
+  * `.first()`, `.last()`, `.eq(index)`
+  * `.parent()`, `.next()`, `.before()`, `.closest(selector)`
+
+```javascript
+// Ví dụ cào danh sách phim siêu ngắn gọn với _$
+function parseListResponse(html, url) {
+    var $doc = _$(html);
+    var items = [];
+    $doc.find(".film-item").each(function() {
+        items.push({
+            id: this.find("a").attr("href"),
+            title: this.find(".title").text().trim(),
+            posterUrl: this.find("img").attr("data-src") || this.find("img").attr("src")
+        });
+    });
+    return JSON.stringify({ items: items });
 }
 ```
+
+---
+
+### 2. `getparam(url, paramName)` — Bóc Tách Tham Số Query An Toàn
+
+Hàm trích xuất giá trị của một query parameter từ URL (hoặc chuỗi URL có chứa pipe `|`):
+
+```javascript
+var url = "https://phim.com/watch?episodeID=12345&server=2|data:token_abc";
+
+var epId = getparam(url, "episodeID"); // "12345"
+var sv = getparam(url, "server");       // "2"
+var missing = getparam(url, "other");   // "" (không throw lỗi, trả về chuỗi rỗng an toàn)
+```
+
+---
+
+### 3. `BASE64.encode(str)` & `BASE64.decode(base64String)` — Mã Hóa & Giải Mã Base64 Chuẩn UTF-8
+
+Hỗ trợ mã hóa/giải mã Base64 hai chiều, tự động chuyển đổi ký tự tiếng Việt có dấu (UTF-8) và hỗ trợ cả URL-safe Base64 (`-` và `_`):
+
+```javascript
+// Mã hóa chuỗi tiếng Việt có dấu
+var encoded = BASE64.encode("Phim Lồng Tiếng 1080p"); 
+
+// Giải mã Base64
+var decoded = BASE64.decode(encoded); // "Phim Lồng Tiếng 1080p"
+
+// Giải mã link ẩn dạng aHR0cHM6...
+var directUrl = BASE64.decode("aHR0cHM6Ly9leGFtcGxlLmNvbS9zdHJlYW0ubTN1OA==");
+```
+
+---
+
+### 4. `CryptoJSAesDecrypt(passphrase, jsonStringOrObj)` — Giải Mã AES-CBC PBKDF2 (Native Cực Nhanh)
+
+Giải mã các payload bảo vệ video được mã hóa bởi CryptoJS dạng JSON (`{"ciphertext": "...", "iv": "...", "salt": "..."}`). App sử dụng cầu nối Native Kotlin (`SecretKeyFactory PBKDF2WithHmacSHA512` + `Cipher AES/CBC`) cho tốc độ giải mã tức thì (< 0.5ms):
+
+```javascript
+// html chứa đoạn mã: CryptoJSAesDecrypt('MySecretPass', '{"ciphertext":"...","iv":"...","salt":"..."}')
+var match = html.match(/CryptoJSAesDecrypt\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"]?(\{[\s\S]*?\})['"]?\s*\)/i);
+if (match) {
+    var passphrase = match[1];
+    var encryptedJson = match[2];
+    var decryptedText = CryptoJSAesDecrypt(passphrase, encryptedJson);
+    console.log("Dữ liệu sau khi giải mã:", decryptedText);
+}
+```
+
+---
+
+### 5. `decodeHTMLtext(str)` — Giải Mã Ký Tự Thực Thể HTML (HTML Entities)
+
+Tự động chuyển đổi các ký tự entity như `&amp;`, `&#39;`, `&#x2F;` về chuỗi ký tự bình thường:
+
+```javascript
+var cleanTitle = decodeHTMLtext("Tom &amp; Jerry &#39;Special&#39;");
+// "Tom & Jerry 'Special'"
+```
+
+---
+
+## ⚡ Cơ Chế Native Video Stream Interceptors (Không Cần Cloudflare Worker) ⭐ (Mới)
+
+Trước đây, nhiều plugin phải gọi lên các Cloudflare Worker (`ggvideo.js`, `phimlongtieng.js`, `reverse proxy`) để xử lý các vấn đề về redirect 302, giải mã stream hoặc ngụy trang định dạng. 
+
+Hiện tại, **Native App đã tích hợp toàn bộ các Network Interceptor ở tầng thấp của ExoPlayer / OkHttp**, cho phép plugin trả về **URL GỐC TRỰC TIẾP**:
+
+### 1. Tự Động Xử Lý Google Video, Blogspot, Blogger, Google Drive (`GoogleVideoInterceptor`)
+* **Tự bắt Redirect 302**: Khi plugin trả về link `3.bp.blogspot.com`, `bp.blogspot.com`, `blogger.com`, `www.blogger.com`, App tự bắt `Location` chuyển hướng và resolve sang URL stream Google CDN gốc (`*.googlevideo.com/videoplayback?...`).
+* **Bảo toàn Header Range (HTTP 206 Partial Content)**: ExoPlayer tự do tua (seek) bất kỳ phân đoạn nào của video MP4 progressive mà không bị gián đoạn luồng stream.
+* **Tự vượt qua cảnh báo quét Virus Google Drive**: Với các file video dung lượng lớn (>100MB) trên `drive.google.com` hoặc `video-downloads.googleusercontent.com` thường bị trả về trang HTML cảnh báo, App tự bóc tách token `confirm` và cookie `download_warning_...` để tải stream thật.
+* **Chuẩn hóa Header & Chống 403 Forbidden**: App tự động lọc bỏ các header `Referer`/`Origin` bên thứ ba mà Google CDN từ chối, đồng thời gắn `User-Agent: Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36` chuẩn.
+* 👉 **Hướng dẫn cho Dev:** Plugin chỉ việc trả về URL video gốc (ví dụ: `https://3.bp.blogspot.com/...` hoặc `https://cdn.hdvideo.homes/stream/1080/...`), **tuyệt đối không cần gọi qua Worker `ggvideo.alokillgtv.workers.dev`**.
+
+### 2. Tự Động Giải Mã Segment Video Ngụy Trang Ảnh PNG (`TiktokPngInterceptor`)
+* Các nguồn phim sử dụng CDN TikTok / Byteimg / Phimhdc ngụy trang các đoạn video TS thành file ảnh `.png` (chứa dữ liệu video TS đóng gói base64 nén zlib ở các chunk `iTXt` của PNG).
+* Native App tự động phát hiện và giải nén trực tiếp trong RAM thành MPEG-TS chuẩn (`video/mp2t`). Plugin chỉ cần nạp link playlist `.m3u8` bình thường.
 
 ---
 
