@@ -1767,6 +1767,13 @@ var res = httpRequest("https://domain-cua-trang.com/api/login", {
 
 if (res && res.isSuccessful) {
     console.log("Mã phản hồi:", res.status);
+    console.log("Cookies nhận được:", JSON.stringify(res.setCookies));
+    console.log("Nội dung body:", res.body);
+}
+```
+
+---
+
 ## 🧰 Thư Viện Tích Hợp Sẵn Trong QuickJS Engine (Built-in JS Libraries) ⭐ (Mới)
 
 Kể từ các phiên bản mới, **VAAPP đã tích hợp sẵn toàn bộ các thư viện phổ biến vào môi trường JavaScript QuickJS**. Nhà phát triển plugin **KHÔNG CẦN** phải copy-paste hàng trăm dòng thư viện (như MiniJQ `_$`, Base64, CryptoJS Decrypt) vào cuối file JS nữa, giúp mã nguồn plugin siêu tinh gọn, sáng sủa và chạy với hiệu năng native cực nhanh.
