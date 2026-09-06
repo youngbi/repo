@@ -14,9 +14,10 @@ function getManifest() {
         "version": "1.0.0",             // Đổi version → App tự cập nhật
         "baseUrl": "https://domain-phim-cua-ban.com",
         "iconUrl": "https://url-icon-vuong.png",
+        "imageReferer": "https://domain-phim-cua-ban.com/", // Header Referer tải ảnh bìa & ảnh truyện chống 403
         "isEnabled": true,
         "isAdult": false,
-        "type": "MOVIE",                // "MOVIE" hoặc "COMIC"
+        "type": "MOVIE",                // "MOVIE" | "COMIC" | "MANGA" | "IPTV" | "SHORTFILM"
         "layoutType": "VERTICAL",       // "VERTICAL" hoặc "HORIZONTAL"
         "playerType": "exoplayer"       // "exoplayer" | "embed" | "embedtoexoplay" | "auto"
     });
@@ -83,6 +84,9 @@ function parseListResponse(html, url) {
                 id: this.find("a").attr("href"),
                 title: this.find(".title").text().trim(),
                 posterUrl: this.find("img").attr("data-src") || this.find("img").attr("src")
+                // quality: "HD",
+                // isCategory: true, // Nếu là Thể loại/Folder (App sẽ hiện ô thẻ màu, không cần posterUrl)
+                // type: "actress"   // Nếu là Diễn viên (App sẽ hiện avatar và bấm vào mở danh sách phim)
             });
         });
         
@@ -159,10 +163,35 @@ function parseMovieDetail(html, url) {
  *   { url: "https://cdn.com/video.vl", mimeType: "application/x-mpegURL" }
  *   → Báo App đây là HLS dù extension không phải .m3u8
  * 
- * @param {string} html - HTML/JSON thô của trang xem tập phim
+ * Trường hợp 5 — Truyện Tranh (Manga / Comic / Novel) — Trả danh sách ảnh:
+ *   {
+ *       images: ["https://cdn.com/1.jpg", "https://cdn.com/2.jpg"],
+ *       headers: { "Referer": "https://manhwa-site.com/" },
+ *       isEmbed: false
+ *   }
+ * 
+ * @param {string} html - HTML/JSON thô của trang xem tập phim hoặc chương truyện
  * @param {string} url - URL thực tế đã fetch để lấy html này
  */
 function parseDetailResponse(html, url) {
+    // -------------------------------------------------------------------------
+    // 📖 NẾU LÀ TRUYỆN TRANH (COMIC / MANGA): Trả về mảng ảnh chương
+    // -------------------------------------------------------------------------
+    // var images = [];
+    // var $doc = _$(html);
+    // $doc.find(".chapter-content img").each(function() {
+    //     var src = this.attr("data-src") || this.attr("src");
+    //     if (src) images.push(src.trim());
+    // });
+    // return JSON.stringify({
+    //     images: images,
+    //     headers: { "Referer": "https://domain-truyen-cua-ban.com/" },
+    //     isEmbed: false
+    // });
+
+    // -------------------------------------------------------------------------
+    // 🎬 NẾU LÀ PHIM (MOVIE / VIDEO): Trả về link stream video
+    // -------------------------------------------------------------------------
     return JSON.stringify({
         url: "https://cdn.example.com/video.m3u8",
         headers: {

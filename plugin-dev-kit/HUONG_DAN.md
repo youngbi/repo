@@ -64,11 +64,25 @@ NẾU type = "MOVIE" / "shortfilm":
       ├─ Nếu isEmbed = true  → App fetch tiếp → gọi parseEmbedResponse()
       │                        (lặp tối đa 3 lần cho đến khi isEmbed = false)
       └─ Nếu playerType = "embed" → WebView load url
+
+NẾU type = "COMIC" / "MANGA" / "NOVEL":
+   Bước 1: parseMovieDetail(html, apiUrl)
+      → Trả servers + episodes (mỗi episode đại diện cho 1 Chapter truyện, có id = URL/slug, bắt buộc slug phải duy nhất cho từng chapter)
+
+   Bước 2: Người dùng chọn đọc Chapter (hoặc App tự mở lại từ Lịch sử đọc)
+      → App gọi getUrlDetail(episode.id) để lấy URL fetch
+      → App tách phần |… → fetch URL sạch → gọi parseDetailResponse(html, apiUrl)
+
+   Bước 3: parseDetailResponse(html, apiUrl)
+      ├─ Cách 1 (Khuyên dùng): Trả { images: ["url_anh_1", "url_anh_2", ...], headers: { "Referer": "..." } }
+      │  → App mở Trình Đọc Truyện Native (Compose Manga Reader) với 5 chế độ đọc, tự động cuộn, đọc nối tiếp vô hạn...
+      └─ Cách 2: Trả { url: "https://web.com/chap-1", isEmbed: true, headers: {...} }
+         → App mở WebView nhúng với cơ chế tự động proxy ảnh và diệt popup quảng cáo
 ```
 
-> 💡 **LƯU Ý QUAN TRỌNG KHI VIẾT PLUGIN (Tránh lỗi mất param & gọi sai tập):**
+> 💡 **LƯU Ý QUAN TRỌNG KHI VIẾT PLUGIN (Tránh lỗi mất param & gọi sai tập/chương):**
 > 1. **Gán Param Mặc Định:** Khi phát kiểu `VIDEO` (hoặc bấm Play từ ngoài), `apiUrl` truyền vào `parseDetailResponse` là URL gốc chưa có param. Plugin nên gán giá trị mặc định trong `getUrlDetail()` hoặc `parseDetailResponse()` (ví dụ: `if (!url.includes("streamVD=")) url += "?streamVD=1";`).
-> 2. **Slug Tập Phải Duy Nhất (`slug`):** Mỗi episode trong mảng `episodes` bắt buộc phải có `slug` độc nhất (ví dụ: `ep-1`, `ep-2`, `720p`, `480p`). **KHÔNG ĐẶT TRÙNG SLUG** (như tất cả tập đều là `"slug": "full"`), vì cơ chế Preload (tải ngầm tập tiếp theo) của App dùng `slug` để xác định tập hiện tại — nếu trùng slug `"full"`, App sẽ luôn xác định bạn đang ở Tập 1 và tự động preload Tập 2!
+> 2. **Slug Tập / Chapter Phải Duy Nhất (`slug`):** Mỗi episode trong mảng `episodes` bắt buộc phải có `slug` độc nhất (ví dụ: `ep-1`, `ep-2`, `chap-1`, `chap-2`). **KHÔNG ĐẶT TRÙNG SLUG** (như tất cả tập/chương đều là `"slug": "full"`), vì cơ chế Preload / Tải nối tiếp ngầm và Lưu lịch sử đọc dở của App dùng `slug` để xác định vị trí hiện tại — nếu trùng slug, App sẽ không thể khôi phục đúng chương/trang dở dang!
 
 ---
 
@@ -444,11 +458,11 @@ Khi đăng ký plugin trên file JSON hoặc thêm nguồn tùy chỉnh, đườ
 | `baseUrl` | String | `""` | Domain chính của web nguồn |
 | `fallbackUrls` | Array\<String\> | `[]` | Danh sách domain dự phòng khi `baseUrl` bị chặn — xem mục [🌐 Domain Fallback](#-domain-fallback--tự-đổi-domain-khi-bị-chặn) |
 | `iconUrl` | String | `""` | Link icon plugin |
-| `referrer` | String | `""` | `Referer` riêng khi tải **ảnh poster** (CDN ảnh chặn hotlink) |
+| `referrer` / `imageReferer` | String | `""` | Header `Referer` chung khi tải **ảnh poster & ảnh trang truyện** (vượt chặn hotlink 403 Forbidden) |
 | `info` | String | `""` | Ghi chú/hướng dẫn riêng hiện trong màn Quản lý Plugin |
 | `isEnabled` | Boolean | `true` | Bật/tắt plugin |
 | `isAdult` | Boolean | `false` | Đánh dấu nội dung 18+ |
-| `type` | Enum | `MOVIE` | `MOVIE` / `VIDEO` / `MANGA` / `NOVEL` / `IPTV` / `SHORTFILM` |
+| `type` | Enum | `MOVIE` | `MOVIE` / `VIDEO` / `COMIC` / `MANGA` / `NOVEL` / `IPTV` / `SHORTFILM` |
 | `layoutType` | Enum | `VERTICAL` | `VERTICAL` (poster 2:3) / `HORIZONTAL` (thumb 16:9) |
 | `playerType` | Enum | `auto` | `exoplayer` / `embed` / `embedtoexoplay` / `auto` |
 | `subtitleCat` | Boolean | `false` | Bật tự tìm phụ đề từ subtitlecat.com |
@@ -734,15 +748,20 @@ App điều khiển giao diện và hành vi điều hướng (mở phim hay m�
 
 #### 💡 Cơ Chế Nhận Diện Trang Trong Plugin (Linh Hoạt & Không Bắt Buộc Từ Khóa Cố Định)
 
-> ❓ **Câu hỏi thường gặp:** *"Plugin có bắt buộc link phải chứa chữ `actresses` hay `genres` không?"*
-> 
-> 👉 **Trả lời: KHÔNG BẮT BUỘC!** App chỉ quan tâm plugin trả về `quality: "CAT"` hay `quality: "ACTRESS"`. Tùy theo từng website, bạn có thể nhận diện loại trang bằng 1 trong 3 cách linh hoạt sau:
+> ⭐ **CẬP NHẬT MỚI (DỄ DÙNG & CHUẨN JSON):**
+> Bạn **KHÔNG CÒN BẮT BUỘC** phải nhồi nhét `"CAT"` hay `"ACTRESS"` vào trường `quality` nữa!
+> App hiện đã hỗ trợ đầy đủ các trường chuẩn hóa hiện đại:
+> 1. **Dùng cờ Boolean**: `"isCategory": true` (hoặc `"isFolder": true`)
+> 2. **Dùng trường Type**: `"type": "category"` / `"genre"` / `"actress"` / `"actor"` / `"folder"`
+> 3. **Không bắt buộc `posterUrl`**: Nếu là Thể loại ô chữ, bạn không cần truyền `posterUrl` (hoặc để rỗng `""`), App tự động render thành thẻ màu đẹp mắt!
+> 4. **Hỗ trợ nhãn phụ (Số lượng phim/Trạng thái)**: Bạn có thể tự do dùng `quality: "128 phim"` hoặc `episode_current: "128 phim"`, App sẽ hiện dòng chữ nhỏ này ngay dưới tên Thể loại!
+> 5. **Tương thích ngược 100%**: Cách cũ `quality: "CAT"` và `quality: "ACTRESS"` vẫn chạy bình thường.
 
 ##### Cách 1: Nhận diện qua tham số `apiUrl` (Khuyên dùng & Đơn giản nhất)
 App luôn truyền URL đang fetch vào tham số thứ 2 của `parseListResponse(html, apiUrl, datasend)`:
 ```javascript
 function parseListResponse(html, apiUrl, datasend) {
-    var movies = [];
+    var items = [];
 
     // Kiểm tra URL theo website của bạn (/dien-vien, /actors, /the-loai, /category, /tags,...)
     var isActressPage = apiUrl.indexOf('/dien-vien') !== -1 || apiUrl.indexOf('/actors') !== -1;
@@ -750,34 +769,35 @@ function parseListResponse(html, apiUrl, datasend) {
 
     if (isActressPage) {
         // Parse danh sách Diễn viên
-        // Gán quality: "ACTRESS"
-        movies.push({
+        // Cách mới: type: "actress" (có poster ảnh đại diện)
+        items.push({
             id: "/dien-vien/ninh-duong-lan-ngoc",
             title: "Ninh Dương Lan Ngọc",
             posterUrl: "https://.../avatar.jpg",
-            quality: "ACTRESS" // App sẽ mở tiếp danh sách phim khi click
+            type: "actress" // Hoặc quality: "ACTRESS" (App sẽ mở tiếp danh sách phim khi click)
         });
     } else if (isGenrePage) {
-        // Parse danh sách Thể loại
-        // Gán quality: "CAT"
-        movies.push({
+        // Parse danh sách Thể loại (Thẻ chữ màu CategoryGrid)
+        // Cách mới: isCategory: true (KHÔNG cần posterUrl, có thể kèm số lượng phim qua quality)
+        items.push({
             id: "/the-loai/kinh-di",
             title: "Kinh Dị",
-            quality: "CAT" // App sẽ hiện thẻ màu và mở tiếp khi click
+            isCategory: true,       // ⭐ Tường minh, chuẩn JSON (hoặc type: "category")
+            quality: "128 phim"    // Tùy chọn: hiện nhãn phụ nhỏ dưới tên thể loại
         });
     } else {
         // Parse danh sách Phim bình thường
-        movies.push({
+        items.push({
             id: "lat-mat-7",
             title: "Lật Mặt 7",
             posterUrl: "https://.../poster.jpg",
-            quality: "HD" // App sẽ mở chi tiết phim khi click
+            quality: "HD"           // Mở màn hình chi tiết phim khi click
         });
     }
 
     return JSON.stringify({
-        items: movies,
-        pagination: { currentPage: 1, totalPages: 10, totalItems: movies.length, itemsPerPage: 20 }
+        items: items,
+        pagination: { currentPage: 1, totalPages: 10, totalItems: items.length, itemsPerPage: 20 }
     });
 }
 ```
@@ -794,15 +814,15 @@ function getPrimaryCategories() {
 }
 
 function parseListResponse(html, apiUrl, datasend) {
-    var movies = [];
+    var items = [];
     if (datasend === "type=actress") {
-        // Xử lý danh sách diễn viên -> quality: "ACTRESS"
+        // Xử lý danh sách diễn viên -> type: "actress" (hoặc quality: "ACTRESS")
     } else if (datasend === "type=genre") {
-        // Xử lý danh sách thể loại -> quality: "CAT"
+        // Xử lý danh sách thể loại -> isCategory: true (hoặc type: "category", quality: "CAT")
     } else {
         // Xử lý danh sách phim thông thường -> quality: "HD"
     }
-    return JSON.stringify({ items: movies, pagination: { currentPage: 1, totalPages: 1 } });
+    return JSON.stringify({ items: items, pagination: { currentPage: 1, totalPages: 1 } });
 }
 ```
 
@@ -883,8 +903,11 @@ function parseMovieDetail(html, apiUrl, datasend) {
 - Nếu là link `.m3u8`/`.mp4` trực tiếp → App phát luôn, KHÔNG gọi `parseDetailResponse`
 - Nếu là slug/URL khác → App gọi `getUrlDetail(episode.id)` → fetch → `parseDetailResponse(html, apiUrl)`
 - Muốn mang thêm token/key sang bước sau → ghép `"|data:" + token` vào `id` (xem [⚡ Quy Ước Dấu `|`](#-quy-ước-dấu--pipe--header-hay-data-của-plugin))
+- **Với Truyện tranh (Manga/Comic)**: Mỗi `episode` đại diện cho một Chương (Chapter). `id` là URL hoặc slug của chương, `name` là tên hiển thị (VD: `"Chương 1"`, `"Chap 105"`).
 
-**🔑 Về `episode.slug`:** Bắt buộc **DUY NHẤT** cho từng tập (`tap-1`, `tap-2`, `720p`…). Cơ chế Preload của App dùng `slug` để xác định tập hiện tại — nếu mọi tập đều `"slug": "full"`, App luôn tưởng bạn đang ở Tập 1 và preload nhầm Tập 2.
+**🔑 Về `episode.slug`:** Bắt buộc **DUY NHẤT** cho từng tập / từng chương (`tap-1`, `tap-2`, `chap-1`, `c100`…).
+- Với Phim: Cơ chế Preload của App dùng `slug` để xác định tập hiện tại và tải ngầm tập kế tiếp.
+- Với Truyện tranh: Cơ chế **Lưu vị trí trang ảnh đang đọc dở**, đánh dấu chương đã đọc và **Đọc nối tiếp không giới hạn** đều dựa vào `slug`. Nếu mọi chương đều dùng chung một slug (như `"full"`), App sẽ không thể khôi phục trang đọc dở và không thể nhảy chương chuẩn xác!
 
 ---
 
@@ -946,9 +969,38 @@ Bạn có thể lồng danh sách các nguồn phát trực tiếp vào mảng *
 
 ---
 
-### `parseDetailResponse()` — Lấy Link Video
+### `parseDetailResponse()` — Lấy Link Video / Danh Sách Ảnh Truyện
 
-#### Trường hợp đơn giản (link trực tiếp):
+#### Trường hợp Truyện Tranh (Manga / Comic / Novel):
+**Cách 1: Trả về danh sách URL ảnh (Khuyên dùng - Native Compose Reader)**
+```json
+{
+    "images": [
+        "https://cdn.example.com/chap1/01.jpg",
+        "https://cdn.example.com/chap1/02.jpg",
+        "https://cdn.example.com/chap1/03.jpg"
+    ],
+    "headers": {
+        "Referer": "https://manhwa.example.com/",
+        "Origin": "https://manhwa.example.com"
+    },
+    "isEmbed": false
+}
+```
+> 💡 *App hỗ trợ linh hoạt các key ảnh:* `images`, `data`, `pages`, `chapter_images`, `items` (chứa mảng string URL hoặc mảng object `{url, src, image, link}`).
+
+**Cách 2: Trả về trang web đọc truyện nhúng (Embed WebView)**
+```json
+{
+    "url": "https://manhwa.example.com/chap-1-embed",
+    "isEmbed": true,
+    "headers": {
+        "Referer": "https://manhwa.example.com/"
+    }
+}
+```
+
+#### Trường hợp Phim đơn giản (link trực tiếp):
 ```json
 {
     "url": "https://cdn.example.com/video.m3u8",
@@ -1495,6 +1547,392 @@ function getManifest() {
         "baseUrl": "https://shortflix.net",
         "type": "shortfilm",        // ⭐ Đánh dấu plugin loại Phim Ngắn
         "playerType": "exoplayer"  // Khuyến nghị dùng exoplayer
+    });
+}
+```
+
+---
+
+## 📖 Hướng Dẫn Viết Plugin Truyện Tranh (Manga / Comic / Novel)
+
+VAAPP không chỉ là ứng dụng xem phim và truyền hình IPTV, mà còn tích hợp sẵn một **Trình Đọc Truyện Native (Compose Manga Reader)** cực mạnh, mượt mà và tối ưu sâu cho Manga (Nhật Bản), Manhwa (Hàn Quốc), Manhua (Trung Quốc), Comic (Âu Mỹ) và Tiểu thuyết (Novel).
+
+### 📑 Mục Lục Phần Này
+- [1. Đặc điểm của Plugin Truyện Tranh trong App](#1-đặc-điểm-của-plugin-truyện-tranh-trong-app)
+- [2. Khai báo Manifest cho Truyện Tranh](#2-khai-báo-manifest-cho-truyện-tranh)
+- [3. Cấu trúc Danh Sách Chương (`parseMovieDetail`)](#3-cấu-trúc-danh-sách-chương-parsemoviedetail)
+- [4. Trả Về Danh Sách Ảnh Chương (`parseDetailResponse`)](#4-trả-về-danh-sách-ảnh-chương-parsedetailresponse)
+  - [Cách A: Trả về Mảng Ảnh trực tiếp (Khuyên Dùng ⭐ - Native Reader)](#cách-a-trả-về-mảng-ảnh-trực-tiếp-khuyên-dùng--native-reader)
+  - [Cách B: Trả về Trang Web Đọc Truyện Nhúng (Embed WebView)](#cách-b-trả-về-trang-web-đọc-truyện-nhúng-embed-webview)
+- [5. Giải Quyết Triệt Để Lỗi Chặn Hotlink Ảnh (403 Forbidden / Anti-hotlink)](#5-giải-quyết-triệt-để-lỗi-chặn-hotlink-ảnh-403-forbidden--anti-hotlink)
+- [6. Kỹ Thuật Lọc Bỏ Ảnh Rác & Quảng Cáo CDN Bằng Javascript Filter](#6-kỹ-thuật-lọc-bỏ-ảnh-rác--quảng-cáo-cdn-bằng-javascript-filter)
+- [7. Các Tính Năng Vượt Trội Của Native Manga Reader Trong App](#7-các-tính-năng-vượt-trội-của-native-manga-reader-trong-app)
+- [8. Code Mẫu Hoàn Chỉnh Cho Plugin Truyện Tranh](#8-code-mẫu-hoàn-chỉnh-cho-plugin-truyện-tranh)
+
+---
+
+### <a id="1-đặc-điểm-của-plugin-truyện-tranh-trong-app"></a>1. Đặc điểm của Plugin Truyện Tranh trong App:
+- Khi người dùng bấm vào một bộ truyện, App sẽ mở **Màn hình Chi tiết Truyện** hiển thị ảnh bìa, tóm tắt, tác giả, thể loại và danh sách tất cả các Chapter/Chương.
+- Khi người dùng bấm đọc một Chapter (hoặc bấm nút "Đọc tiếp" từ Lịch sử), App sẽ gọi `parseDetailResponse()` để lấy **danh sách URL các trang ảnh** (`images: [...]`) và mở **Trình Đọc Truyện Native Compose** (thay vì mở ExoPlayer phát video).
+- Không cần xây dựng server proxy bên ngoài hay Cloudflare Worker để bypass chặn ảnh hotlink: Native App tự động xử lý toàn bộ headers và Referer ở tầng mạng OkHttp & Coil.
+
+---
+
+### <a id="2-khai-báo-manifest-cho-truyện-tranh"></a>2. Khai báo Manifest cho Truyện Tranh:
+```javascript
+function getManifest() {
+    return JSON.stringify({
+        "id": "my_manga_plugin",
+        "name": "Truyện Tranh Hay",
+        "version": "1.0.0",
+        "baseUrl": "https://manhwa-example.com",
+        "type": "COMIC",                // ⭐ Bắt buộc: "COMIC" hoặc "MANGA" hoặc "NOVEL"
+        "layoutType": "VERTICAL",       // Khuyên dùng: VERTICAL (tỉ lệ poster 2:3 chuẩn cho truyện)
+        "imageReferer": "https://manhwa-example.com/", // ⭐ Referer chung tải ảnh poster & ảnh truyện
+        "playerType": "exoplayer",      // "exoplayer" (hoặc "auto") để dùng Native Compose Reader
+        "isEnabled": true,
+        "isAdult": false
+    });
+}
+```
+
+> 💡 **Lưu ý về `imageReferer`:**
+> Nếu website truyện sử dụng CDN ảnh có cơ chế chống hotlink (kiểm tra header `Referer`), hãy khai báo `"imageReferer": "https://domain-goc.com/"`. App sẽ tự động gắn header này vào toàn bộ request tải ảnh bìa (poster) và ảnh chương truyện, không lo bị lỗi ảnh 403 Forbidden!
+
+---
+
+### <a id="3-cấu-trúc-danh-sách-chương-parsemoviedetail"></a>3. Cấu trúc Danh Sách Chương (`parseMovieDetail`):
+Trong hàm `parseMovieDetail()`, bạn trích xuất thông tin bộ truyện và danh sách các Chapter đặt vào mảng `servers[0].episodes`:
+
+```javascript
+function parseMovieDetail(html, apiUrl, datasend) {
+    var $doc = _$(html);
+    var title = $doc.find("h1.story-title").text().trim();
+    var posterUrl = $doc.find(".book-cover img").attr("src");
+    var description = $doc.find(".summary-content").text().trim();
+    var author = $doc.find(".author a").text().trim();
+    var status = $doc.find(".status-label").text().trim();
+
+    // Bóc tách danh sách Chapter:
+    var chapters = [];
+    $doc.find(".chapter-list a").each(function() {
+        var chapterUrl = this.attr("href");
+        var chapterName = this.text().trim();
+        // Trích xuất slug duy nhất (ví dụ: "chap-1", "chapter-120")
+        var chapterSlug = chapterUrl.replace(/\/$/, "").split("/").pop();
+
+        chapters.push({
+            id: chapterUrl,          // URL để App fetch nội dung chương
+            name: chapterName,       // Tên hiển thị (VD: "Chương 1", "Chap 50")
+            slug: chapterSlug        // ⭐ BẮT BUỘC DUY NHẤT CHO TỪNG CHƯƠNG
+        });
+    });
+
+    return JSON.stringify({
+        id: apiUrl.split("|")[0],
+        title: title,
+        posterUrl: posterUrl,
+        description: description,
+        casts: author,               // Dùng casts để chứa Tác giả
+        status: status,              // Đang tiến hành / Hoàn thành
+        servers: [
+            {
+                name: "Danh Sách Chương",
+                episodes: chapters   // Mảng các chapter truyện
+            }
+        ]
+    });
+}
+```
+
+> ⚠️ **QUY TẮC BẮT BUỘC VỀ `slug` CHƯƠNG:**
+> - Mỗi chapter trong `episodes` **bắt buộc phải có `slug` độc nhất** (ví dụ: `chap-1`, `chap-2`, `chapter-100`).
+> - **Tuyệt đối không đặt trùng slug** (như tất cả chapter đều để `"slug": "read"` hoặc `"full"`).
+> - **Lý do:** App dựa vào `slug` để:
+>   1. Đánh dấu chương đã đọc.
+>   2. Lưu và khôi phục chính xác vị trí trang ảnh (`pageIndex`) đang đọc dở.
+>   3. Tải ngầm chương kế tiếp (Preload) và kích hoạt tính năng **Đọc nối tiếp không giới hạn** (tự động nối chương sau vào cuối trang).
+
+---
+
+### <a id="4-trả-về-danh-sách-ảnh-chương-parsedetailresponse"></a>4. Trả Về Danh Sách Ảnh Chương (`parseDetailResponse`):
+
+Khi người dùng mở đọc một chương, App gửi URL chương đến server, nhận HTML thô và truyền vào `parseDetailResponse(html, apiUrl, datasend)`. Bạn có 2 cách trả dữ liệu:
+
+#### <a id="cách-a-trả-về-mảng-ảnh-trực-tiếp-khuyên-dùng--native-reader"></a>Cách A: Trả về Mảng Ảnh trực tiếp (Khuyên Dùng ⭐ - Native Reader)
+Đây là cách tối ưu nhất để người dùng có trải nghiệm đọc truyện tuyệt vời với đầy đủ tính năng của Native Reader:
+
+```javascript
+function parseDetailResponse(html, apiUrl, datasend) {
+    var images = [];
+    var $doc = _$(html);
+
+    // Cách 1: Dùng MiniJQ (_$) bóc thẻ <img> trong khung đọc truyện:
+    $doc.find(".reading-detail img, .page-chapter img").each(function() {
+        var src = this.attr("data-src") || this.attr("data-original") || this.attr("src");
+        if (src) {
+            images.push(src.trim());
+        }
+    });
+
+    // Cách 2: Nếu website nhúng mảng ảnh trong thẻ script JSON/JS:
+    // var match = html.match(/var\s+chapter_images\s*=\s*(\[[^\]]+\]);/);
+    // if (match) {
+    //     try { images = JSON.parse(match[1]); } catch(e) {}
+    // }
+
+    // Lọc bỏ banner quảng cáo / ảnh rác nếu có:
+    images = images.filter(function(url) {
+        return !url.includes("ads") && !url.includes("banner") && !url.includes("shopee");
+    });
+
+    return JSON.stringify({
+        images: images,              // Mảng các đường dẫn ảnh theo đúng thứ tự đọc
+        headers: {
+            "Referer": "https://manhwa-example.com/", // Header bypass chống hotlink ảnh
+            "Origin": "https://manhwa-example.com",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        isEmbed: false
+    });
+}
+```
+
+> 💡 **Khả Năng Tương Thích Dữ Liệu Của App (Lenient Keys):**
+> App tự động nhận diện danh sách ảnh từ nhiều khóa khác nhau trong JSON trả về:
+> - Khóa `images`: `["https://...1.jpg", "https://...2.jpg"]`
+> - Khóa `data`: `["https://...1.jpg", ...]`
+> - Khóa `pages`: `["https://...1.jpg", ...]`
+> - Khóa `chapter_images`: `["https://...1.jpg", ...]`
+> - Mảng Object: `[{"url": "https://...1.jpg"}, {"src": "https://...2.jpg"}]`
+> - Mảng JSON thuần: `["https://...1.jpg", "https://...2.jpg"]`
+
+#### <a id="cách-b-trả-về-trang-web-đọc-truyện-nhúng-embed-webview"></a>Cách B: Trả về Trang Web Đọc Truyện Nhúng (Embed WebView)
+Dành cho các trang truyện có cơ chế chống trích xuất quá phức tạp (render ảnh lên thẻ HTML5 Canvas đã bị mã hóa hoặc chia nhỏ ảnh thành nhiều ô ghép lại):
+
+```javascript
+function parseDetailResponse(html, apiUrl, datasend) {
+    return JSON.stringify({
+        url: apiUrl.split("|")[0],   // URL trang đọc truyện
+        isEmbed: true,               // Đánh dấu là web nhúng
+        headers: {
+            "Referer": "https://manhwa-example.com/"
+        }
+    });
+}
+```
+
+> 🛡️ **Cơ Chế WebView Thông Minh Của App:**
+> Khi ở chế độ Embed, App tự động:
+> 1. Intercept mọi request tải ảnh bên trong WebView, tự động đính kèm `Referer` và `Origin` tương ứng để không bị chặn ảnh.
+> 2. Chạy ngầm kịch bản tự động phát hiện và bấm đóng (Close / Dismiss / Skip) toàn bộ popup quảng cáo lơ lửng trên trang truyện.
+
+---
+
+### <a id="5-giải-quyết-triệt-để-lỗi-chặn-hotlink-ảnh-403-forbidden--anti-hotlink"></a>5. Giải Quyết Triệt Để Lỗi Chặn Hotlink Ảnh (403 Forbidden / Anti-hotlink):
+
+Rất nhiều nguồn truyện tranh lớn (như NetTruyen, CuuTruyen, ManhwaWeb...) bảo vệ CDN ảnh của họ bằng cách chặn tất cả request không có `Referer` hoặc có `Referer` không thuộc domain của họ (lỗi HTTP `403 Forbidden`).
+
+**Trước đây:** Các nhà phát triển phải dựng Cloudflare Worker hoặc reverse proxy để gắn header `Referer` tải ảnh trung gian, gây tốn băng thông và làm chậm tốc độ tải ảnh.
+
+**Hiện tại với VAAPP:**
+1. **Toàn Bộ Xử Lý Đều Native 100%:** App sử dụng bộ thư viện Coil & OkHttp tích hợp sẵn Native Interceptors.
+2. **Cơ Chế Tự Động Gắn Referer:**
+   - Nếu trong `parseDetailResponse()` có khai báo `headers: { "Referer": "..." }`, App sẽ gửi chính xác header đó cho từng trang ảnh của chương.
+   - Nếu trong chương không khai báo header riêng, App tự động lấy trường `imageReferer` (hoặc `referrer`) khai báo trong `getManifest()` để gán vào request ảnh.
+   - Đối với ảnh bìa / poster ngoài danh sách, App tự động chuyển tiếp param `_referer` vào chuỗi URL để `ImageRefererInterceptor` native nạp vào HTTP header.
+3. 👉 **Kết luận:** Dev plugin chỉ cần khai báo đúng `Referer` nguồn, ảnh sẽ tải mượt mà với tốc độ gốc tối đa mà **không cần bất kỳ server proxy nào**!
+
+---
+
+### <a id="6-kỹ-thuật-lọc-bỏ-ảnh-rác--quảng-cáo-cdn-bằng-javascript-filter"></a>6. Kỹ Thuật Lọc Bỏ Ảnh Rác & Quảng Cáo CDN Bằng Javascript Filter:
+
+Nhiều nguồn truyện chèn ảnh banner quảng cáo của nhà cái, banner mời tải app shopee hoặc ảnh giới thiệu nhóm dịch lặp đi lặp lại ở đầu và cuối mỗi chương. Bạn có thể làm sạch mảng ảnh ngay trong JavaScript trước khi trả về App:
+
+```javascript
+// Danh sách các từ khóa URL ảnh quảng cáo hoặc rác
+var AD_KEYWORDS = [
+    "quang-cao", "banner", "shopee", "betting", "casino",
+    "credit", "donate", "ads", "sponsor", "join-group"
+];
+
+// Lọc mảng ảnh:
+images = images.filter(function(imgUrl) {
+    if (!imgUrl || typeof imgUrl !== "string") return false;
+    var lower = imgUrl.toLowerCase();
+    
+    // Loại bỏ nếu URL chứa bất kỳ từ khóa quảng cáo nào
+    for (var i = 0; i < AD_KEYWORDS.length; i++) {
+        if (lower.indexOf(AD_KEYWORDS[i]) !== -1) {
+            return false;
+        }
+    }
+    
+    // Đảm bảo là đường dẫn ảnh hợp lệ
+    return lower.startsWith("http://") || lower.startsWith("https://");
+});
+```
+
+---
+
+### <a id="7-các-tính-năng-vượt-trội-của-native-manga-reader-trong-app"></a>7. Các Tính Năng Vượt Trội Của Native Manga Reader Trong App:
+
+Khi bạn trả về danh sách ảnh qua `images: [...]`, người dùng sẽ được tận hưởng trọn vẹn bộ tính năng đọc truyện cao cấp được xây dựng công phu:
+
+#### 📖 1. Đa dạng 5 Chế độ đọc linh hoạt:
+Người dùng có thể dễ dàng chuyển đổi chế độ đọc bất cứ lúc nào qua nút Cài Đặt (biểu tượng bánh răng ở góc trên bên phải):
+- **Webtoon (Cuộn dọc)**: Cuộn mượt mà từ trên xuống dưới theo phong cách Manhwa/Webtoon.
+- **Trang đơn (L→R - Trái sang phải)**: Lật từng trang từ trái sang phải như đọc sách thông thường.
+- **Manga (R→L - Phải sang trái)**: Lật từng trang theo chiều từ phải sang trái chuẩn Manga Nhật Bản.
+- **Trang đôi (L→R - Double Spread)**: App tự động xoay ngang màn hình (Landscape), ghép 2 trang ảnh song song cạnh nhau như trải rộng 2 trang sách giấy.
+- **Manga đôi (R→L - Double Spread Manga)**: App tự động xoay ngang màn hình, ghép 2 trang ảnh đọc từ phải sang trái chuẩn Manga Nhật Bản.
+
+#### 👆 2. Cử chỉ Chạm 2 mép màn hình (Edge Tapping):
+- Ở các chế độ **Trang đơn** và **Trang đôi**:
+  - Chạm vào **25% mép trái màn hình**: Lùi về trang trước (hoặc sang trang sau tùy theo chiều đọc LTR hay RTL).
+  - Chạm vào **25% mép phải màn hình**: Tiến sang trang kế tiếp.
+  - Chạm vào **50% ở giữa màn hình**: Bật/tắt thanh điều khiển (Controls Bar) và menu cài đặt.
+- Ở chế độ **Webtoon**: Chạm vào bất kỳ vị trí nào trên màn hình đều bật/tắt thanh điều khiển, không bắt cử chỉ mép để tránh chạm nhầm khi người dùng vuốt tay cuộn dọc.
+
+#### ♾️ 3. Đọc nối tiếp không giới hạn (Infinite / Continuous Reading):
+- Khi đọc ở chế độ Webtoon đến gần cuối chương hiện tại, App sẽ **tự động tải ngầm và nối tiếp chương tiếp theo vào cuối danh sách cuộn**.
+- Người dùng có thể đọc liền mạch hàng chục chương liên tục như một trang dài bất tận mà không bao giờ bị gián đoạn hay phải bấm nút "Chương sau".
+- Khi cuộn qua ranh giới giữa các chương, tiêu đề chương trên thanh trạng thái sẽ tự động cập nhật theo thời gian thực.
+
+#### ⏩ 4. Tự động cuộn theo nhịp VSync (Auto Scroll):
+- Tích hợp động cơ cuộn tự động đồng bộ theo nhịp khung hình màn hình phần cứng (VSync 60Hz/120Hz).
+- Hỗ trợ thanh trượt điều chỉnh tốc độ cuộn từ chậm đến nhanh (1x đến 5x).
+- Người dùng có thể rảnh tay hoàn toàn khi đọc truyện, chỉ cần chạm nhẹ vào màn hình để tạm dừng hoặc tiếp tục cuộn.
+
+#### 🌙 5. Thanh chỉnh độ sáng riêng biệt (Dark Scrim Filter):
+- Cho phép người đọc kéo thanh trượt điều chỉnh độ sáng màn hình từ 15% đến 100% trực tiếp ngay trong menu cài đặt của trình đọc.
+- Sử dụng lớp phủ Scrim đen tối ưu dịu mắt khi đọc truyện ban đêm trong phòng tối mà **tuyệt đối không làm thay đổi thiết lập độ sáng hệ thống của điện thoại**.
+
+#### 📌 6. Tự động lưu và cuộn đến đúng trang ảnh đang đọc dở (Auto-Resume):
+- App tự động ghi nhớ vị trí trang ảnh (`pageIndex`) mà bạn đang đọc dở vào cơ sở dữ liệu lịch sử theo thời gian thực (với cơ chế debounce tiết kiệm pin).
+- Khi người dùng quay lại đọc bộ truyện, App sẽ **tự động cuộn ngay lập tức đến đúng trang ảnh bạn đang đọc dở**, không cần phải tìm kiếm hay cuộn lại từ đầu.
+
+---
+
+### <a id="8-code-mẫu-hoàn-chỉnh-cho-plugin-truyện-tranh"></a>8. Code Mẫu Hoàn Chỉnh Cho Plugin Truyện Tranh:
+
+Dưới đây là mã nguồn hoàn chỉnh của một plugin truyện tranh mẫu sẵn sàng sử dụng:
+
+```javascript
+// =============================================================================
+// PLUGIN MANGA MẪU - VAAPP
+// =============================================================================
+
+function getManifest() {
+    return JSON.stringify({
+        "id": "demo_manga",
+        "name": "Manga Toon Demo",
+        "version": "1.0.0",
+        "baseUrl": "https://manhwa-demo.com",
+        "type": "COMIC",                // ⭐ Bắt buộc cho truyện tranh
+        "layoutType": "VERTICAL",       // Ảnh bìa đứng 2:3
+        "imageReferer": "https://manhwa-demo.com/", // Chống chặn ảnh hotlink
+        "playerType": "exoplayer",      // Dùng Native Manga Reader
+        "isEnabled": true
+    });
+}
+
+function getHomeSections() {
+    return JSON.stringify([
+        { slug: "truyen-moi", title: "Truyện Mới Cập Nhật", type: "Horizontal", path: "" },
+        { slug: "manhwa-hot", title: "Manhwa Thịnh Hành", type: "Horizontal", path: "" }
+    ]);
+}
+
+function getUrlList(slug, filtersJson) {
+    var page = JSON.parse(filtersJson || "{}").page || 1;
+    return "https://manhwa-demo.com/danh-sach/" + slug + "?page=" + page;
+}
+
+function parseListResponse(html, apiUrl) {
+    var $doc = _$(html);
+    var items = [];
+
+    $doc.find(".comic-item").each(function() {
+        var a = this.find("a.title-link");
+        var img = this.find("img");
+        items.push({
+            id: a.attr("href"),
+            title: a.text().trim(),
+            posterUrl: img.attr("data-src") || img.attr("src")
+        });
+    });
+
+    return JSON.stringify({
+        items: items,
+        pagination: { currentPage: 1, totalPages: 10 }
+    });
+}
+
+function getUrlDetail(slug) {
+    // Nếu slug đã là URL đầy đủ thì trả về luôn, nếu không thì ghép với baseUrl
+    if (slug.indexOf("http") === 0) return slug;
+    return "https://manhwa-demo.com/truyen/" + slug;
+}
+
+function parseMovieDetail(html, apiUrl) {
+    var $doc = _$(html);
+    var title = $doc.find("h1.title").text().trim();
+    var posterUrl = $doc.find(".poster img").attr("src");
+    var description = $doc.find(".summary").text().trim();
+    var author = $doc.find(".author a").text().trim();
+
+    var chapters = [];
+    $doc.find(".chapter-list li a").each(function() {
+        var href = this.attr("href");
+        var name = this.text().trim();
+        // Lấy slug độc nhất cho từng chapter
+        var slug = href.replace(/\/$/, "").split("/").pop();
+
+        chapters.push({
+            id: href,
+            name: name,
+            slug: slug
+        });
+    });
+
+    return JSON.stringify({
+        id: apiUrl.split("|")[0],
+        title: title,
+        posterUrl: posterUrl,
+        description: description,
+        casts: author,
+        servers: [
+            {
+                name: "Danh Sách Chương",
+                episodes: chapters
+            }
+        ]
+    });
+}
+
+function parseDetailResponse(html, apiUrl) {
+    var images = [];
+    var $doc = _$(html);
+
+    // Bóc tách toàn bộ ảnh trong khung đọc truyện
+    $doc.find(".chapter-content img").each(function() {
+        var src = this.attr("data-src") || this.attr("src");
+        if (src) images.push(src.trim());
+    });
+
+    // Lọc bỏ banner quảng cáo
+    images = images.filter(function(url) {
+        return !url.includes("ads") && !url.includes("banner");
+    });
+
+    return JSON.stringify({
+        images: images,
+        headers: {
+            "Referer": "https://manhwa-demo.com/",
+            "Origin": "https://manhwa-demo.com"
+        },
+        isEmbed: false
     });
 }
 ```

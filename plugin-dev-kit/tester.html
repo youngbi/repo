@@ -274,11 +274,13 @@
                         }
                     }
                     if (funcName === 'parseDetailResponse') {
-                        if (!parsed.url) {
-                            outBox.value += '\n\n⚠️ Thiếu trường "url" — App cần URL video để phát';
+                        if (parsed.images && Array.isArray(parsed.images)) {
+                            outBox.value += '\n\n📖 [COMIC / MANGA] Phát hiện mảng ảnh (' + parsed.images.length + ' trang ảnh) → App sẽ mở Trình Đọc Truyện Native Compose Reader!';
+                        } else if (!parsed.url) {
+                            outBox.value += '\n\n⚠️ Thiếu trường "url" (cho Video/Phim) hoặc "images" (cho Truyện tranh/Manga)';
                         }
                         if (parsed.isEmbed) {
-                            outBox.value += '\n\n📌 isEmbed=true → App sẽ fetch URL này và gọi parseEmbedResponse()';
+                            outBox.value += '\n\n📌 isEmbed=true → App sẽ fetch URL này và gọi parseEmbedResponse() (hoặc mở WebView đọc truyện nếu là comic)';
                         }
                         if (parsed.mimeType) {
                             outBox.value += '\n\n📌 mimeType="' + parsed.mimeType + '" → ExoPlayer sẽ dùng content type này';
