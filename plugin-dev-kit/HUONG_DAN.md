@@ -731,28 +731,153 @@ function getStreamLink(episodeId, datasend) {
 
 ---
 
-#### 📁 Cơ Chế Lồng Thư Mục (Nested Categories & Drill-down) cho Thể Loại & Diễn Viên
+#### 📁 Cơ Chế Tuyển Tập & Thư Mục Lồng Nhau Đa Cấp (Nested Collections & Hierarchical Folders)
 
-Trong App, một màn hình danh sách (`CategoryScreen`) có thể đóng vai trò là **Danh sách Phim**, **Danh sách Thể Loại**, hoặc **Danh sách Diễn Viên**. 
+App hỗ trợ tính năng **Thư mục / Tuyển tập lồng nhau đa tầng (N-Level Drill-down)** bắt đầu từ **Trang chủ (Home)**, **Tìm kiếm (Search)** cho đến các màn hình danh sách (`CategoryScreen`):
 
-App điều khiển giao diện và hành vi điều hướng (mở phim hay mở tiếp thư mục con) thông qua thuộc tính **`quality`** của từng item trong mảng `items`:
+##### 🎯 Trường Hợp Sử Dụng Điển Hình:
+- **Tầng 1 (Trang chủ Home)**: Xuất hiện thẻ *"Tuyển tập Doraemon"* (có ảnh poster riêng của bộ sưu tập).
+- **Tầng 2 (Bấm vào Tuyển tập Doraemon)**: App mở danh sách các thư mục con:
+  - *"Doraemon Phim Dài"* (`isCategory: true`)
+  - *"Doraemon Phim Ngắn"* (`isCategory: true`)
+  - *"Doraemon Bản Điện Ảnh 2026"* (`isCategory: true`)
+- **Tầng 3 (Bấm vào Doraemon Phim Dài)**: App mở danh sách các phim lẻ cụ thể:
+  - *"Doraemon: Nobita và Bản Giao Hưởng Địa Cầu"* (`isCategory: false` → Mở màn hình Chi Tiết Phim `DetailScreen`)
+  - *"Doraemon: Nobita và Cuộc Chiến Vũ Trụ Tí Hon"* (`isCategory: false` → Mở Chi Tiết Phim)
+- **Quay lại (Back)**: Người dùng bấm phím Back trên điện thoại hoặc bấm nút Back trên Remote TV sẽ **lùi từng cấp một** (Chi tiết → Doraemon Phim Dài → Tuyển tập Doraemon → Trang chủ) cực kỳ mượt mà!
 
-| Giá trị `quality` | Giao diện hiển thị trên App | Hành vi khi người dùng Bấm (Click) |
-| :--- | :--- | :--- |
-| **`"CAT"`** | **Category Grid** (Thẻ chữ nhật màu sắc nổi bật) | **Mở tiếp thư mục con**: App gọi `CategoryScreen` với slug `item.id` (Drill-down) |
-| **`"ACTRESS"`** | **Photo Grid** (Lưới thẻ ảnh avatar diễn viên) | **Mở danh sách phim của diễn viên**: App gọi `CategoryScreen` với slug `item.id` |
-| **`"HD"`, `"FHD"`, `"CAM"`, v.v.** | **Movie Card** (Poster phim tiêu chuẩn) | **Mở màn hình chi tiết phim** (`DetailScreen` / `detail/{id}`) |
-| **`"INFO"`** | **Thông báo / Hướng dẫn** (Dùng khi báo lỗi hoặc trang tìm kiếm động) | Không mở phim |
+---
+
+#### 🛠️ Bảng Quy Ước Nhận Diện Thư Mục / Phim:
+
+App tự động nhận diện một item là **Tuyển tập / Thư mục** hay **Phim thường** dựa trên các trường sau:
+
+| Thuộc tính khai báo trong item | Ý nghĩa | Giao diện hiển thị | Hành vi khi Click |
+| :--- | :--- | :--- | :--- |
+| **`"isCategory": true`** hoặc **`"isFolder": true`** | Thư mục / Tuyển tập con | • Có `posterUrl`: **Lưới ảnh Poster** bộ sưu tập<br>• Không `posterUrl`: **Thẻ chữ màu** (Category Grid) | **Mở danh sách con**: App gọi `CategoryScreen` với slug `item.id` |
+| **`"type": "folder"`** / `"category"` / `"collection"` / `"actress"` | Thư mục / Tuyển tập / Diễn viên | Tương tự trên | **Mở danh sách con**: App gọi `CategoryScreen` với slug `item.id` |
+| **`"quality": "CAT"`** / `"FOLDER"` / `"ACTRESS"` | Chuẩn quy ước cũ (tương thích ngược) | Tương tự trên | **Mở danh sách con**: App gọi `CategoryScreen` với slug `item.id` |
+| **Không khai báo các trường trên** (hoặc `isCategory: false`) | Phim / Video cụ thể | **Poster phim tiêu chuẩn** | **Mở màn hình Chi tiết phim** (`DetailScreen` / `detail/{id}`) |
+
+> 💡 **Mẹo hiển thị**:
+> - Nếu bạn truyền `posterUrl`, App sẽ render thành **Thẻ ảnh Poster** sang trọng (rất phù hợp cho Tuyển tập như *Tuyển tập Doraemon*, *Vũ trụ Marvel*, *Tuyển tập Châu Tinh Trì*, *Diễn viên*).
+> - Nếu bạn **không truyền `posterUrl`** (hoặc để rỗng `""`), App sẽ tự động render thành **Thẻ chữ màu** (Category Grid ô màu), cực kỳ hợp cho danh mục thể loại thuần túy như *Hành động, Tình cảm, Kinh dị*!
+
+---
+
+#### 💡 Ví Dụ Mẫu Code Plugin Hoàn Chỉnh:
+
+```javascript
+// 1. Khai báo Section trên Trang chủ
+function getHomeSections() {
+    return JSON.stringify([
+        { slug: "home-tuyen-tap", title: "Bộ Sưu Tập & Tuyển Tập Hay", type: "Horizontal" },
+        { slug: "phim-moi", title: "Phim Mới Cập Nhật", type: "Horizontal" }
+    ]);
+}
+
+// 2. App gọi getUrlList để lấy dữ liệu cho Section hoặc cho Thư mục con
+function getUrlList(slug, filtersJson) {
+    var page = JSON.parse(filtersJson || "{}").page || 1;
+    // slug có thể là "home-tuyen-tap", hoặc "tuyen-tap-doraemon", hoặc "doraemon-phim-dai"
+    return "https://api.myweb.com/list/" + slug + "?page=" + page;
+}
+
+// 3. Xử lý phân cấp trong parseListResponse
+function parseListResponse(html, apiUrl, datasend) {
+    var items = [];
+
+    if (apiUrl.indexOf("home-tuyen-tap") !== -1) {
+        // CẤP 1 (TRANG CHỦ): Trả về các Bộ Sưu Tập Lớn
+        items.push({
+            id: "tuyen-tap-doraemon",
+            title: "Tuyển Tập Doraemon",
+            posterUrl: "https://img.myweb.com/doraemon-collection.jpg",
+            isFolder: true,             // ⭐ Bấm vào sẽ mở cấp 2
+            quality: "Tuyển tập 50+ phim" // Nhãn hiển thị nhỏ
+        });
+        items.push({
+            id: "vu-tru-marvel",
+            title: "Vũ Trụ Điện Ảnh Marvel (MCU)",
+            posterUrl: "https://img.myweb.com/marvel.jpg",
+            isCategory: true,           // ⭐ Bấm vào sẽ mở cấp 2
+            quality: "Phase 1 - Phase 5"
+        });
+    } else if (apiUrl.indexOf("tuyen-tap-doraemon") !== -1) {
+        // CẤP 2: Các nhóm con bên trong Doraemon
+        items.push({
+            id: "doraemon-phim-dai",
+            title: "Doraemon Phim Dài (Chiếu Rạp)",
+            posterUrl: "https://img.myweb.com/doraemon-movies.jpg",
+            isCategory: true,           // ⭐ Tiếp tục lồng cấp 3!
+            quality: "43 phim"
+        });
+        items.push({
+            id: "doraemon-phim-ngan",
+            title: "Doraemon Phim Ngắn",
+            posterUrl: "https://img.myweb.com/doraemon-short.jpg",
+            isCategory: true,           // ⭐ Tiếp tục lồng cấp 3!
+            quality: "25 tập"
+        });
+    } else if (apiUrl.indexOf("doraemon-phim-dai") !== -1) {
+        // CẤP 3: Danh sách các phim lẻ cụ thể
+        items.push({
+            id: "doraemon-ban-giao-huong-dia-cau",
+            title: "Doraemon: Bản Giao Hưởng Địa Cầu (2024)",
+            posterUrl: "https://img.myweb.com/giao-huong.jpg",
+            isCategory: false,          // ⭐ Phim cuối -> bấm vào mở màn hình Detail!
+            quality: "FHD",
+            year: 2024
+        });
+        items.push({
+            id: "doraemon-vung-dat-ly-tuong-bau-troi",
+            title: "Doraemon: Vùng Đất Lý Tưởng Trên Bầu Trời",
+            posterUrl: "https://img.myweb.com/bau-troi.jpg",
+            isCategory: false,          // ⭐ Mở màn hình Detail!
+            quality: "FHD",
+            year: 2023
+        });
+    }
+
+    return JSON.stringify({
+        items: items,
+        pagination: { currentPage: 1, totalPages: 1, totalItems: items.length, itemsPerPage: 20 }
+    });
+}
+```
+
+---
+
+##### 📺 Ví Dụ Thực Tế: Đặt Tuyển Tập Vào Hàng Ngang Danh Mục Trang Chủ (Ví dụ mục "Hoạt Hình POP")
+
+Giả sử trên Trang chủ bạn có các danh mục hàng ngang như **"Hoạt Hình POP"**, **"Nhạc Bolero"**, **"Phim"**:
+
+1. **Đặt Thẻ Tuyển tập ngay trong hàng ngang**:
+   - Bạn có thể đặt thẻ *"Thám Tử Lừng Danh Conan Trọn bộ lồng tiếng"* (hoặc *"Tuyển tập Doraemon"*) nằm chung hàng ngang với các phim/video khác.
+   - Chỉ cần thêm `"isFolder": true` (hoặc `"isCategory": true`), kèm thumbnail 16:9 và nhãn `"episode_current": "1061 Tập"`:
+     ```javascript
+     items.push({
+         id: "conan-tuyen-tap",
+         title: "Thám Tử Lừng Danh Conan Trọn bộ lồng tiếng",
+         posterUrl: "https://img.myweb.com/conan-thumb.jpg",
+         isFolder: true,              // ⭐ App nhận diện để bấm vào sẽ mở danh sách con
+         episode_current: "1061 Tập", // Nhãn số tập góc trên thẻ
+         quality: "HD"
+     });
+     ```
+   - Khi người dùng lướt ngang thấy thẻ này và bấm vào $\rightarrow$ App lập tức mở danh sách các phần/vụ án con của Conan thay vì mở thẳng màn hình xem!
+
+2. **Hành vi nút mũi tên đỏ `->` (Xem thêm) cạnh tiêu đề danh mục**:
+   - Khi người dùng bấm vào tiêu đề danh mục hoặc nút mũi tên `->` bên cạnh chữ **"Hoạt Hình POP"**, App sẽ mở màn hình danh mục đầy đủ (`CategoryScreen`).
+   - Tại đây, plugin có thể trả về danh sách gồm nhiều Tuyển tập lớn (Conan, Doraemon, Shin Cậu Bé Bút Chì, Naruto...). Bấm vào bất kỳ tuyển tập nào sẽ tiếp tục lồng sâu vào các phần/tập bên trong.
 
 ---
 
 #### 💡 Cơ Chế Nhận Diện Trang Trong Plugin (Linh Hoạt & Không Bắt Buộc Từ Khóa Cố Định)
 
-> ⭐ **CẬP NHẬT MỚI (DỄ DÙNG & CHUẨN JSON):**
-> Bạn **KHÔNG CÒN BẮT BUỘC** phải nhồi nhét `"CAT"` hay `"ACTRESS"` vào trường `quality` nữa!
-> App hiện đã hỗ trợ đầy đủ các trường chuẩn hóa hiện đại:
-> 1. **Dùng cờ Boolean**: `"isCategory": true` (hoặc `"isFolder": true`)
-> 2. **Dùng trường Type**: `"type": "category"` / `"genre"` / `"actress"` / `"actor"` / `"folder"`
+> ⭐ **TỔNG KẾT CÁC CÁCH KHAI BÁO THƯ MỤC / TUYỂN TẬP:**
+> 1. **Dùng cờ Boolean**: `"isCategory": true` hoặc `"isFolder": true`
+> 2. **Dùng trường Type**: `"type": "folder"` / `"collection"` / `"category"` / `"genre"` / `"actress"` / `"actor"`
 > 3. **Không bắt buộc `posterUrl`**: Nếu là Thể loại ô chữ, bạn không cần truyền `posterUrl` (hoặc để rỗng `""`), App tự động render thành thẻ màu đẹp mắt!
 > 4. **Hỗ trợ nhãn phụ (Số lượng phim/Trạng thái)**: Bạn có thể tự do dùng `quality: "128 phim"` hoặc `episode_current: "128 phim"`, App sẽ hiện dòng chữ nhỏ này ngay dưới tên Thể loại!
 > 5. **Tương thích ngược 100%**: Cách cũ `quality: "CAT"` và `quality: "ACTRESS"` vẫn chạy bình thường.

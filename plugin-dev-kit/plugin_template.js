@@ -85,7 +85,8 @@ function parseListResponse(html, url) {
                 title: this.find(".title").text().trim(),
                 posterUrl: this.find("img").attr("data-src") || this.find("img").attr("src")
                 // quality: "HD",
-                // isCategory: true, // Nếu là Thể loại/Folder (App sẽ hiện ô thẻ màu, không cần posterUrl)
+                // isCategory: true, // ⭐ Thư mục / Tuyển tập / Thể loại (Bấm vào sẽ mở danh sách con thay vì mở Detail)
+                // isFolder: true,   // Tương đương isCategory: true (Có posterUrl -> hiện thẻ ảnh, Không posterUrl -> hiện ô chữ màu)
                 // type: "actress"   // Nếu là Diễn viên (App sẽ hiện avatar và bấm vào mở danh sách phim)
             });
         });
