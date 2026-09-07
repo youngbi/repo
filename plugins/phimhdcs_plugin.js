@@ -6,7 +6,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimhdcs",
         "name": "PhimHDCS",
-        "version": "1.1.4",
+        "version": "1.1.5",
         "baseUrl": "https://phimhdcss.com",
         "iconUrl": "https://phimhdcss.com/favicon.ico",
         "isEnabled": true,
@@ -526,15 +526,30 @@ function parseDetailResponse(htmlContent, pageUrl) {
         }
 
         if (oxData) {
+            // Helper: decode chunks for a key
+            var decodeKey = function (key) {
+                if (key && oxData[key] && Array.isArray(oxData[key])) {
+                    var u = decodeChunksWithSalt(oxData[key], saltString);
+                    if (u && u.indexOf("player.php?") !== -1) {
+                        var m = /[?&](?:link|url)=([^&]+)/.exec(u);
+                        if (m) u = decodeURIComponent(m[1]);
+                    }
+                    return u;
+                }
+                return null;
+            };
+
             // Extract curId (current episode ID)
             var curId = null;
             var curIdPatterns = [
+                /class="[^"]*streaming-server[^"]*active[^"]*"[^>]*data-id="(\d+)"/i,
+                /class="[^"]*active[^"]*streaming-server[^"]*"[^>]*data-id="(\d+)"/i,
+                /data-id="(\d+)"[^>]*class="[^"]*streaming-server[^"]*active/i,
+                /data-id="(\d+)"[^>]*class="[^"]*active[^"]*streaming-server/i,
                 /(?:const|let|var)\s+curId\s*=\s*['"]?(\d+)['"]?/,
                 /(?:const|let|var)\s+episode\s*=\s*['"]?(\d+)['"]?/,
                 /(?:const|let|var)\s+episode_id\s*=\s*['"]?(\d+)['"]?/,
-                /(?:const|let|var)\s+currentEpisodeId\s*=\s*['"]?(\d+)['"]?/,
-                /data-id="(\d+)"[^>]*class="[^"]*active[^"]*streaming-server/i,
-                /class="[^"]*active[^"]*streaming-server[^"]*"[^>]*data-id="(\d+)"/i
+                /(?:const|let|var)\s+currentEpisodeId\s*=\s*['"]?(\d+)['"]?/
             ];
             for (var pi = 0; pi < curIdPatterns.length; pi++) {
                 var m = curIdPatterns[pi].exec(htmlContent);
@@ -559,47 +574,74 @@ function parseDetailResponse(htmlContent, pageUrl) {
                 if (keys.length > 0) targetId = keys[0];
             }
 
-            if (targetId && oxData[targetId] && Array.isArray(oxData[targetId])) {
-                var chunks = oxData[targetId];
-                log('PHIMHDCS_DEBUG decoding targetId=' + targetId + ', chunks=' + chunks.length + ', salt=' + saltString);
-                var playerUrl = decodeChunksWithSalt(chunks, saltString);
-                log('PHIMHDCS_DEBUG decoded playerUrl: ' + playerUrl);
+            // Giải mã tất cả các server có trong oxData để phân loại & chọn server tốt nhất
+            var serverMap = {};
+            var directServerUrl = null;
+            var abyssServerUrl = null;
+            var streamXemPhimHdUrl = null;
+            var fallbackServerUrl = null;
 
-                // Lọc bỏ wrapper player.php?link= hoặc player.php?url= để lấy link stream trực tiếp
-                if (playerUrl && playerUrl.indexOf("player.php?") !== -1) {
-                    var matchLink = /[?&](?:link|url)=([^&]+)/.exec(playerUrl);
-                    if (matchLink) {
-                        var decodedLink = decodeURIComponent(matchLink[1]);
-                        log('PHIMHDCS_DEBUG extracted direct link from player.php: ' + decodedLink);
-                        playerUrl = decodedLink;
+            for (var serverKey in oxData) {
+                if (oxData.hasOwnProperty(serverKey)) {
+                    var decodedCandidate = decodeKey(serverKey);
+                    if (decodedCandidate && decodedCandidate.indexOf('http') === 0) {
+                        serverMap[serverKey] = decodedCandidate;
+                        log('PHIMHDCS_DEBUG server candidate [' + serverKey + ']: ' + decodedCandidate);
+
+                        var isCandidateDirect = decodedCandidate.indexOf('.m3u8') !== -1 || decodedCandidate.indexOf('.mp4') !== -1;
+                        if (isCandidateDirect && !directServerUrl) {
+                            directServerUrl = decodedCandidate;
+                        } else if ((decodedCandidate.indexOf('abyssplayer.com') !== -1 || decodedCandidate.indexOf('abysscdn.com') !== -1 || decodedCandidate.indexOf('playhydrax.com') !== -1) && !abyssServerUrl) {
+                            abyssServerUrl = decodedCandidate;
+                        } else if (decodedCandidate.indexOf('streamxemphimhd.site') !== -1 && !streamXemPhimHdUrl) {
+                            streamXemPhimHdUrl = decodedCandidate;
+                        } else if (!fallbackServerUrl && decodedCandidate.indexOf('tiktok') === -1) {
+                            fallbackServerUrl = decodedCandidate;
+                        }
                     }
                 }
-                
-                if (playerUrl && playerUrl.indexOf('http') === 0) {
-                    var isDirect = playerUrl.indexOf('.m3u8') !== -1 || playerUrl.indexOf('.mp4') !== -1;
-                    if (isDirect) {
-                        return JSON.stringify({
-                            url: playerUrl,
-                            isEmbed: false,
-                            mimeType: "application/x-mpegURL",
-                            headers: {
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                                "Referer": "https://phimhdcss.com/"
-                            },
-                            subtitles: []
-                        });
-                    } else {
-                        return JSON.stringify({
-                            url: playerUrl,
-                            isEmbed: true,
-                            headers: {
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                                "Referer": "https://phimhdcss.com/"
-                            },
-                            subtitles: []
-                        });
-                    }
-                }
+            }
+
+            // Thứ tự ưu tiên phát:
+            // 1. Link stream trực tiếp (.m3u8 / .mp4, ví dụ từ Server HD kkphimplayer...) -> Native ExoPlayer ngay lập tức
+            // 2. Server AbyssPlayer / Hydrax -> Native HydraxExtractor của VAAPP giải mã tức thì
+            // 3. Server StreamXemPhimHD -> Chuỗi 3 tầng với đầy đủ Sec-Fetch-* headers
+            // 4. Server targetId ban đầu theo URL tập phim
+            // 5. Fallback server bất kỳ còn lại
+            var chosenUrl = null;
+            var chosenIsDirect = false;
+
+            if (directServerUrl) {
+                log('PHIMHDCS_DEBUG selected DIRECT m3u8 stream: ' + directServerUrl);
+                chosenUrl = directServerUrl;
+                chosenIsDirect = true;
+            } else if (abyssServerUrl) {
+                log('PHIMHDCS_DEBUG selected AbyssPlayer stream: ' + abyssServerUrl);
+                chosenUrl = abyssServerUrl;
+                chosenIsDirect = false;
+            } else if (streamXemPhimHdUrl) {
+                log('PHIMHDCS_DEBUG selected StreamXemPhimHD stream: ' + streamXemPhimHdUrl);
+                chosenUrl = streamXemPhimHdUrl;
+                chosenIsDirect = false;
+            } else if (targetId && serverMap[targetId]) {
+                chosenUrl = serverMap[targetId];
+                chosenIsDirect = chosenUrl.indexOf('.m3u8') !== -1 || chosenUrl.indexOf('.mp4') !== -1;
+            } else if (fallbackServerUrl) {
+                chosenUrl = fallbackServerUrl;
+                chosenIsDirect = chosenUrl.indexOf('.m3u8') !== -1 || chosenUrl.indexOf('.mp4') !== -1;
+            }
+
+            if (chosenUrl) {
+                return JSON.stringify({
+                    url: chosenUrl,
+                    isEmbed: !chosenIsDirect,
+                    mimeType: chosenIsDirect ? "application/x-mpegURL" : undefined,
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        "Referer": "https://phimhdcss.com/"
+                    },
+                    subtitles: []
+                });
             }
         }
 
@@ -695,11 +737,11 @@ function parseYearsResponse(htmlContent) {
     } catch (e) { return "[]"; }
 }
 
-function parseEmbedResponse(htmlContent, url) {
+function parseEmbedResponse(htmlContent, url, datasend) {
     try {
         log("parseEmbedResponse input url: " + url);
         
-        // --- XỬ LÝ DEPTH 2: Phản hồi từ endpoint getVideo (là JSON string) ---
+        // --- XỬ LÝ DEPTH 3: Phản hồi từ endpoint getVideo (JSON string chứa stream link) ---
         if (url.indexOf("do=getVideo") !== -1 || (htmlContent.indexOf("securedLink") !== -1 && htmlContent.indexOf("hls") !== -1)) {
             log("parseEmbedResponse processing getVideo JSON response");
             var jData = JSON.parse(htmlContent);
@@ -712,26 +754,44 @@ function parseEmbedResponse(htmlContent, url) {
                 streamUrl = jData.videoSources[0].file;
             }
             
-            // Lấy subtitles được truyền từ depth 1 qua query parameter
+            // Lấy subtitles được truyền qua datasend (hoặc fallback query parameter)
             var subtitles = [];
-            var subMatch = /[?&]subs=([^&]+)/.exec(url);
-            if (subMatch) {
+            if (datasend) {
                 try {
-                    subtitles = JSON.parse(decodeURIComponent(subMatch[1]));
-                } catch(e) {
-                    log("parseEmbedResponse parse subs query parameter error: " + e);
+                    var state = JSON.parse(datasend);
+                    if (state.subtitles && Array.isArray(state.subtitles)) {
+                        subtitles = state.subtitles;
+                    }
+                } catch (e) {
+                    log("parseEmbedResponse parse datasend subtitles error: " + e);
+                }
+            }
+            if (subtitles.length === 0) {
+                var subMatch = /[?&]subs=([^&]+)/.exec(url);
+                if (subMatch) {
+                    try {
+                        subtitles = JSON.parse(decodeURIComponent(subMatch[1]));
+                    } catch (e) {
+                        log("parseEmbedResponse parse subs query parameter error: " + e);
+                    }
                 }
             }
             
             if (streamUrl) {
                 log("parseEmbedResponse found streamUrl: " + streamUrl);
+                var pipeHeaders = "Referer=https://play.streamxemphimhd.site/&Origin=https://play.streamxemphimhd.site&Sec-Fetch-Site=cross-site&Sec-Fetch-Mode=cors&Sec-Fetch-Dest=empty";
+                var urlWithPipe = streamUrl.indexOf("|") === -1 ? (streamUrl + "|" + pipeHeaders) : streamUrl;
                 return JSON.stringify({
-                    url: streamUrl,
+                    url: urlWithPipe,
                     isEmbed: false, // Dừng vòng lặp để phát Native
                     mimeType: "application/x-mpegURL",
                     headers: {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Referer": "https://play.streamxemphimhd.site/"
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Referer": "https://play.streamxemphimhd.site/",
+                        "Origin": "https://play.streamxemphimhd.site",
+                        "Sec-Fetch-Site": "cross-site",
+                        "Sec-Fetch-Mode": "cors",
+                        "Sec-Fetch-Dest": "empty"
                     },
                     subtitles: subtitles
                 });
@@ -741,7 +801,68 @@ function parseEmbedResponse(htmlContent, url) {
             }
         }
 
-        // --- XỬ LÝ DEPTH 1: Phản hồi từ trang embed HTML ban đầu ---
+        // --- XỬ LÝ DEPTH 2: Phản hồi từ endpoint guard_issue.php (JSON string chứa token bảo mật) ---
+        if (url.indexOf("guard_issue.php") !== -1) {
+            log("parseEmbedResponse processing guard_issue JSON response");
+            var guardToken = "";
+            try {
+                var gData = JSON.parse(htmlContent);
+                if (gData && gData.token) {
+                    guardToken = gData.token;
+                }
+            } catch (e) {
+                log("parseEmbedResponse parse guard_issue JSON error: " + e);
+            }
+
+            if (!guardToken) {
+                log("parseEmbedResponse failed to obtain guard token, aborting");
+                return JSON.stringify({ url: "", isEmbed: false, headers: {}, subtitles: [] });
+            }
+
+            var state = {};
+            if (datasend) {
+                try {
+                    state = JSON.parse(datasend);
+                } catch (e) {}
+            }
+            if (!state.embedId) {
+                var idParamMatch = /[?&]id=([^&]+)/.exec(url);
+                if (idParamMatch) state.embedId = idParamMatch[1];
+            }
+
+            if (!state.embedId) {
+                log("parseEmbedResponse missing embedId at Depth 2, aborting");
+                return JSON.stringify({ url: "", isEmbed: false, headers: {}, subtitles: [] });
+            }
+
+            var videoUrl = "https://play.streamxemphimhd.site/player/index.php?data=" + state.embedId + "&do=getVideo";
+            var postBody = "hash=" + encodeURIComponent(state.embedId) + "&r=https%3A%2F%2Fphimhdcss.com%2F&fp_guard=" + encodeURIComponent(guardToken);
+            var embedRef = state.embedUrl || ("https://play.streamxemphimhd.site/video/" + state.embedId);
+
+            var headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Referer": embedRef,
+                "Origin": "https://play.streamxemphimhd.site",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-Requested-With": "XMLHttpRequest",
+                "X-FP-Guard": guardToken,
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Dest": "empty"
+            };
+
+            log("parseEmbedResponse returning POST request to getVideo API with guard token");
+            return JSON.stringify({
+                url: videoUrl,
+                isEmbed: true, // Tiếp tục vòng lặp Depth 3
+                postBody: postBody,
+                headers: headers,
+                datasend: JSON.stringify(state),
+                subtitles: []
+            });
+        }
+
+        // --- XỬ LÝ DEPTH 1: Phản hồi từ trang embed HTML ban đầu (/video/<id>) ---
         log("parseEmbedResponse processing HTML embed page");
         
         // 1. Trích xuất ID của video từ url
@@ -751,8 +872,21 @@ function parseEmbedResponse(htmlContent, url) {
             embedId = idMatch[1];
         }
         
-        // 2. Tìm kiếm JS packer và giải mã để lấy phụ đề (subtitles)
+        // 2. Tìm kiếm phụ đề từ biến playerjsSubtitle trong JS HTML
         var subtitles = [];
+        var subRegex = /\[([^\]]+)\](https?:\/\/[^"',;\s]+)/g;
+        var sm;
+        while ((sm = subRegex.exec(htmlContent)) !== null) {
+            var label = sm[1].trim();
+            var subFile = sm[2].trim();
+            subtitles.push({
+                lang: label,
+                url: subFile,
+                isAutoTranslated: false
+            });
+        }
+
+        // 3. Tìm kiếm JS packer và giải mã nếu cần lấy ID hoặc subtitles dự phòng
         var match = htmlContent.match(/eval\((function\(p,a,c,k,e,d\)[\s\S]+?split\('\|'\),0,\{\}\))\)/);
         if (match) {
             var innerCode = match[1];
@@ -766,21 +900,22 @@ function parseEmbedResponse(htmlContent, url) {
                     embedId = firePlayerIdMatch[1];
                 }
                 
-                // Trích xuất subtitles
-                var tracksMatch = /"tracks"\s*:\s*(\[[\s\S]*?\])/.exec(unpacked);
-                if (tracksMatch) {
-                    var tracks = JSON.parse(tracksMatch[1]);
-                    for (var i = 0; i < tracks.length; i++) {
-                        var track = tracks[i];
-                        if (track.kind === "captions" && track.file && track.label) {
-                            subtitles.push({
-                                lang: track.label,
-                                url: track.file,
-                                isAutoTranslated: false
-                            });
+                // Trích xuất subtitles nếu chưa có từ playerjsSubtitle
+                if (subtitles.length === 0) {
+                    var tracksMatch = /"tracks"\s*:\s*(\[[\s\S]*?\])/.exec(unpacked);
+                    if (tracksMatch) {
+                        var tracks = JSON.parse(tracksMatch[1]);
+                        for (var i = 0; i < tracks.length; i++) {
+                            var track = tracks[i];
+                            if (track.kind === "captions" && track.file && track.label) {
+                                subtitles.push({
+                                    lang: track.label,
+                                    url: track.file,
+                                    isAutoTranslated: false
+                                });
+                            }
                         }
                     }
-                    log("parseEmbedResponse found subtitles: " + subtitles.length);
                 }
             } catch (e) {
                 log("parseEmbedResponse eval packer error: " + e);
@@ -792,24 +927,35 @@ function parseEmbedResponse(htmlContent, url) {
             return JSON.stringify({ url: "", isEmbed: false, headers: {}, subtitles: [] });
         }
         
-        // 3. Trả về cấu hình POST request đến API getVideo để VAAPP fetch tiếp (depth 2)
-        var subtitlesQuery = encodeURIComponent(JSON.stringify(subtitles));
-        var postUrl = "https://play.streamxemphimhd.site/player/index.php?data=" + embedId + "&do=getVideo&subs=" + subtitlesQuery;
-        var postBody = "hash=" + embedId + "&r=https%3A%2F%2Fphimhdcss.com%2F";
+        log("parseEmbedResponse found subtitles: " + subtitles.length);
+        
+        // 4. Trả về cấu hình POST request đến API guard_issue.php để lấy token bảo mật (Depth 2)
+        var guardUrl = "https://play.streamxemphimhd.site/player/guard_issue.php?id=" + encodeURIComponent(embedId);
+        var postBody = "t=" + Date.now();
         var headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Referer": url,
             "Origin": "https://play.streamxemphimhd.site",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-Requested-With": "XMLHttpRequest"
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Dest": "empty"
         };
         
-        log("parseEmbedResponse returning POST request to getVideo API");
+        var state = {
+            embedId: embedId,
+            embedUrl: url,
+            subtitles: subtitles
+        };
+
+        log("parseEmbedResponse returning POST request to guard_issue.php");
         return JSON.stringify({
-            url: postUrl,
-            isEmbed: true, // Tiếp tục vòng lặp tiếp theo
+            url: guardUrl,
+            isEmbed: true, // Tiếp tục vòng lặp Depth 2
             postBody: postBody,
             headers: headers,
+            datasend: JSON.stringify(state),
             subtitles: []
         });
         
