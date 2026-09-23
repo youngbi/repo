@@ -2269,6 +2269,8 @@ while ((match = regex.exec(html)) !== null) {
 ✅ `getSetCookie(url, options)` — Lấy chuỗi `Set-Cookie` gộp từ Server
 ✅ `getResponseHeaders(url, options)` — Lấy toàn bộ Response Headers từ Server
 ✅ `httpRequest(url, options)` — Gọi HTTP GET/POST/HEAD đồng bộ
+✅ `fetchAll(requests, options)` / `httpBatchRequest` — Cào mạng song song đa luồng (siêu tốc, Native OkHttp Pool) ⭐ (Mới)
+✅ `fetch(url, options)` — Tiêu chuẩn Web API fetch (polyfill đồng bộ `.json()`, `.text()`) ⭐ (Mới)
 ✅ `getCookie(url)` — Đọc cookie đã lưu trong CookieManager của App
 ✅ `toast(message)` — Hiển thị Toast thông báo
 ✅ `console.log / warn / error / info / print` — In log ra Console của App
@@ -2334,6 +2336,108 @@ if (res && res.isSuccessful) {
     console.log("Nội dung body:", res.body);
 }
 ```
+
+### 5. `fetchAll(requests, options)` / `httpBatchRequest(requests, options)` — Cào Mạng Song Song Đa Luồng (Siêu Tốc) ⭐ (Mới)
+
+Trước đây, khi cần lấy thông tin của nhiều tập phim hoặc gọi nhiều API cùng lúc, nếu dùng vòng lặp `for` với `httpRequest()`, các request sẽ phải chờ nhau lần lượt (tuần tự), khiến tổng thời gian chờ bị đội lên rất lâu (ví dụ 10 tập mất 10-15 giây).
+
+Hàm `fetchAll` (hoặc alias `httpBatchRequest`) giải quyết triệt để vấn đề này bằng cách **bắn đồng thời toàn bộ request trên Native Coroutine Dispatchers.IO và OkHttp Connection Pool của Android**. Thời gian lấy 10-20 tập phim giảm xuống **chỉ còn khoảng 0.5 - 1 giây**!
+
+#### Cách 1: Danh sách URL với Headers / Options dùng chung
+```javascript
+var urls = [
+    "https://api.example.com/episodes/1",
+    "https://api.example.com/episodes/2",
+    "https://api.example.com/episodes/3"
+];
+
+// Bắn song song cả 3 request cùng lúc
+var responses = fetchAll(urls, {
+    headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Referer": "https://example.com/"
+    },
+    // vax: true // (Tùy chọn) Kích hoạt đi qua Virtual Local Proxy vax.local
+});
+
+// Kết quả là mảng response theo đúng thứ tự mảng urls truyền vào
+responses.forEach(function(res, index) {
+    if (res.isSuccessful) {
+        console.log("Tập " + (index + 1) + ":", res.body);
+    }
+});
+```
+
+#### Cách 2: Danh sách Request Object độc lập (Mỗi request có method, url, headers riêng)
+```javascript
+var requests = [
+    { url: "https://api.site.com/detail/101", method: "GET" },
+    { 
+        url: "https://api.site.com/ajax/token", 
+        method: "POST", 
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "id=101&type=vip" 
+    },
+    { url: "https://api.site.com/detail/102", method: "GET" }
+];
+
+var results = fetchAll(requests);
+
+for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    console.log("URL:", r.url, "Status:", r.status, "Body length:", r.body.length);
+}
+```
+
+> 💡 **Cấu trúc trả về của mỗi phần tử trong `responses`**:
+> ```javascript
+> {
+>     status: 200,          // HTTP Status Code (number)
+>     isSuccessful: true,   // true nếu 200 <= status < 300
+>     url: "https://...",   // URL thực tế của request
+>     headers: { ... },     // Response Headers
+>     setCookies: [ ... ],  // Mảng Set-Cookie do server trả về
+>     body: "..."           // Nội dung phản hồi dạng chuỗi (text/JSON/HTML)
+> }
+> ```
+
+---
+
+### 6. `fetch(url, options)` — Chuẩn Web API Tiêu Chuẩn ⭐ (Mới)
+
+Nhằm giúp Dev dễ dàng tái sử dụng (copy-paste) các đoạn mã JavaScript viết cho trình duyệt hoặc Node.js mà không cần sửa lại thành `httpRequest`, VAAPP cung cấp sẵn hàm `fetch` theo chuẩn Web API (thực thi đồng bộ trong QuickJS Engine):
+
+```javascript
+// GET đơn giản
+var res = fetch("https://api.example.com/movie/phim-moi");
+if (res.ok) {
+    var data = res.json(); // Tự parse JSON thành Object
+    console.log("Tên phim:", data.title);
+}
+
+// POST với Headers và Body
+var res = fetch("https://api.example.com/auth", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ key: "secret_123" })
+});
+
+console.log("Status:", res.status);         // 200
+console.log("StatusText:", res.statusText); // "OK"
+console.log("Content-Type:", res.headers.get("content-type"));
+var text = res.text();                      // Lấy body dạng text
+```
+
+> **Các phương thức & thuộc tính của `fetch Response`**:
+> - `res.ok`: `true` nếu mã trạng thái nằm trong khoảng 200-299.
+> - `res.status`: Mã phản hồi HTTP (VD: `200`, `404`, `500`).
+> - `res.statusText`: Mô tả trạng thái (VD: `"OK"`, `"Not Found"`).
+> - `res.url`: URL thực tế.
+> - `res.headers`: Có hàm `headers.get(name)` hoặc truy cập trực tiếp `headers[name]`.
+> - `res.text()`: Trả về toàn bộ body dạng `String`.
+> - `res.json()`: Tự động chạy `JSON.parse(res.body)` và trả về Object/Array.
 
 ---
 
@@ -2456,6 +2560,150 @@ Hiện tại, **Native App đã tích hợp toàn bộ các Network Interceptor 
 ### 2. Tự Động Giải Mã Segment Video Ngụy Trang Ảnh PNG (`TiktokPngInterceptor`)
 * Các nguồn phim sử dụng CDN TikTok / Byteimg / Phimhdc ngụy trang các đoạn video TS thành file ảnh `.png` (chứa dữ liệu video TS đóng gói base64 nén zlib ở các chunk `iTXt` của PNG).
 * Native App tự động phát hiện và giải nén trực tiếp trong RAM thành MPEG-TS chuẩn (`video/mp2t`). Plugin chỉ cần nạp link playlist `.m3u8` bình thường.
+
+---
+
+## 🛡️ Hệ Thống Virtual Local Proxy (vax.local) — Thay Thế Hoàn Toàn Cloudflare Worker ⭐ (Mới)
+
+Trước đây, nhiều nhà phát triển plugin phải tự triển khai các Cloudflare Worker cá nhân (như `test.js`, `proxy.js`, `reverse proxy`) để:
+1. Vượt rào cản CORS khi fetch dữ liệu hoặc stream trong WebView.
+2. Gắn header `Referer`, `User-Agent`, `Origin` tùy biến để bypass cơ chế chống hotlink.
+3. Fallback sang gateway dự phòng (`httprequest.net`) khi IP thiết bị bị rate-limit hoặc chặn.
+
+Tuy nhiên, việc phụ thuộc vào Cloudflare Worker bên ngoài bộc lộ nhiều hạn chế:
+- Bị giới hạn 100,000 request/ngày đối với tài khoản miễn phí.
+- Bị gián đoạn khi cáp quang biển gặp sự cố hoặc dải IP Cloudflare bị nhà mạng chặn.
+- Độ trễ vòng lặp cao (200ms - 500ms) do phải truyền qua máy chủ trung gian nước ngoài.
+
+### 🌟 Cơ Chế Native: Virtual Host Nội Bộ `https://vax.local`
+
+VAAPP đã tích hợp sẵn một **Virtual Local Proxy** chạy hoàn toàn trên máy người dùng:
+- **0ms latency trung gian**: Request được Native Client chặn (intercept) và xử lý trực tiếp trên thiết bị, không thông qua server proxy trung gian nào.
+- **Không giới hạn hạn ngạch (Unlimited)**: Chạy nội bộ trên điện thoại / TV Box của người dùng.
+- **Đồng bộ trên cả WebView và ExoPlayer**: Hoạt động mượt mà ở cả tầng trình duyệt web và tầng Native Media Player.
+
+---
+
+### 📌 Các Endpoint Hỗ Trợ
+
+#### 1. Endpoint Đơn Giản: `https://vax.local/fetch`
+Dùng để tải trang HTML, JSON API hoặc file m3u8 có kèm Headers tùy biến:
+
+```
+https://vax.local/fetch?url=<ENCODED_URL>&referer=<ENCODED_REF>&cookie=<ENCODED_COOKIE>&origin=<ENCODED_ORIGIN>&ua=<ENCODED_UA>
+```
+
+**Ví dụ trong JavaScript:**
+```javascript
+var targetUrl = "https://api.privatesite.com/video/master.m3u8";
+var proxyUrl = "https://vax.local/fetch?url=" + encodeURIComponent(targetUrl) 
+             + "&referer=" + encodeURIComponent("https://privatesite.com/")
+             + "&ua=" + encodeURIComponent("Mozilla/5.0 (Linux; Android 13)");
+
+// App sẽ tự động gửi request đến targetUrl với đúng Referer và UA trên!
+```
+
+---
+
+#### 2. Endpoint Tương Thích Hoàn Toàn với `test.js` & `proxy.js`: `https://vax.local/p` và `https://vax.local/px`
+
+Nếu bạn đang có sẵn logic mã hóa query `d` dạng Base64 / Base64Url từ các Cloudflare Worker cũ (`test.js`, `proxy.js`), bạn **CHỈ CẦN THAY DOMAIN THÀNH `https://vax.local/p` HOẶC `https://vax.local/px`** mà không cần viết lại mã nguồn plugin!
+
+```
+https://vax.local/p?d=<BASE64URL_PAYLOAD>
+https://vax.local/px?d=<BASE64URL_PAYLOAD> (Tự động kích hoạt chế độ fallback)
+```
+
+**Cấu trúc dữ liệu JSON đóng gói vào `d`:**
+```json
+{
+    "url": "https://api.example.com/stream.m3u8",
+    "headers": {
+        "Referer": "https://example.com/",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13)"
+    },
+    "fallback": true
+}
+```
+
+**Ví dụ hàm tạo link proxy tương thích 100% trong Plugin:**
+```javascript
+function makeVaxProxyUrl(url, headers, useFallback) {
+    var payload = {
+        url: url,
+        headers: headers || {},
+        fallback: !!useFallback
+    };
+    // Mã hóa Base64 URL Safe
+    var jsonStr = JSON.stringify(payload);
+    var b64 = BASE64.encode(jsonStr)
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/, '');
+                    
+    return "https://vax.local/p?d=" + b64;
+}
+
+// Sử dụng:
+var streamUrl = makeVaxProxyUrl("https://stream.server.com/playlist.m3u8", {
+    "Referer": "https://server.com/"
+}, true);
+```
+
+> 🛡️ **Cơ chế Tự Động Fallback Cứu Hộ (`fallback: true`)**:
+> Khi bạn bật `fallback: true` (hoặc gọi qua `/px`), nếu request trực tiếp từ mạng của người dùng bị lỗi (HTTP 403, 502 hoặc mất kết nối), Native App sẽ **tự động chuyển hướng request sang gateway `httprequest.net`** để vượt tường lửa — y hệt như logic trong Cloudflare Worker trước đây của bạn!
+
+---
+
+#### 3. Endpoint Trình Phát Web Player IPTV: `https://vax.local/tv`
+
+Khi bạn cần nhúng một luồng phát IPTV hoặc HLS vào WebView nhưng luồng đó bắt buộc phải có `Referer` hoặc `Origin` đặc thù:
+
+```
+https://vax.local/tv?url=<ENCODED_M3U8_URL>&referer=<ENCODED_REFERER>&origin=<ENCODED_ORIGIN>
+```
+
+App đã tích hợp sẵn một trang HTML5 Player cực đẹp (dựa trên Hls.js mới nhất), tự động truyền các header bảo mật và phát video toàn màn hình mượt mà.
+
+---
+
+## 🎬 Giải Pháp Cho Vấn Đề "M3U8 & Strict Referer" (Khắc Phục Lỗi Chặn Hotlink 403 Phân Đoạn .TS) ⭐ (Mới)
+
+Nhiều Dev băn khoăn: *"Khi một stream M3U8 yêu cầu Referer, file `master.m3u8` chứa hàng nghìn file phân đoạn `.ts`. Nếu player chỉ gửi Referer lúc tải `master.m3u8` thì các file `.ts` sau đó có bị lỗi 403 không? Dev có phải tự tải file m3u8 về rồi dùng regex sửa từng dòng link `.ts` qua proxy không?"*
+
+### ✅ Trường hợp 1: Khi phát bằng ExoPlayer (Native Player mặc định của VAAPP) — KHUYÊN DÙNG ⭐⭐⭐⭐⭐
+
+👉 **DEV HOÀN TOÀN KHÔNG CẦN SỬA ĐỔI NỘI DUNG FILE M3U8!**
+
+Trong `parseDetailResponse()`, bạn chỉ việc trả về:
+```javascript
+return JSON.stringify({
+    url: "https://cdn.domain.com/hls/master.m3u8",
+    headers: {
+        "Referer": "https://domain.com/",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 13)"
+    }
+});
+```
+
+**Tại sao hoạt động hoàn hảo?**
+Hạ tầng `OkHttpDataSource` của Native ExoPlayer trong VAAPP được thiết kế để **tự động kế thừa và chuyển tiếp (propagate) toàn bộ Headers** bạn khai báo vào **TẤT CẢ các request tiếp theo**:
+- Master playlist (`master.m3u8`)
+- Media playlist con (`720p.m3u8`, `1080p.m3u8`)
+- 100% các phân đoạn video chunk (`segment-1.ts`, `segment-2.ts`, ...)
+- Các file giải mã DRM / AES-128 key (`enc.key`)
+
+Video chạy mượt 100%, tua (seek) tức thì mà không tốn công rewrite hay can thiệp vào cấu trúc playlist!
+
+---
+
+### ✅ Trường hợp 2: Khi phát bằng WebView (Embed / Hls.js)
+
+Do cơ chế bảo mật Same-Origin Policy của trình duyệt web (WebView), các thẻ `<video>` hoặc thư viện Hls.js chạy trong môi trường web không cho phép tùy biến header `Referer` cho từng request `.ts`.
+
+Lúc này, bạn có thể:
+1. **Sử dụng Web Player IPTV nội bộ**: Trả về link dạng `https://vax.local/tv?url=...&referer=...`.
+2. Hoặc nếu tự viết trang HTML player riêng, bạn có thể bọc URL qua `https://vax.local/fetch?url=...` để Native App tự động inject Header vào từng phân đoạn.
 
 ---
 
