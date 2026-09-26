@@ -2655,15 +2655,26 @@ var streamUrl = makeVaxProxyUrl("https://stream.server.com/playlist.m3u8", {
 
 ---
 
-#### 3. Endpoint Trình Phát Web Player IPTV: `https://vax.local/tv`
+#### 3. Endpoint Trình Phát Web Player IPTV: `https://vax.local/tv` (Hoặc `tv/index.html`)
 
-Khi bạn cần nhúng một luồng phát IPTV hoặc HLS vào WebView nhưng luồng đó bắt buộc phải có `Referer` hoặc `Origin` đặc thù:
+Khi bạn cần nhúng giao diện Web Player IPTV (có sẵn danh sách kênh, chọn nhóm, EPG và trình phát Hls.js/Dash/FLV tích hợp) vào WebView:
 
 ```
-https://vax.local/tv?url=<ENCODED_M3U8_URL>&referer=<ENCODED_REFERER>&origin=<ENCODED_ORIGIN>
+https://vax.local/tv/index.html?url=<ENCODED_OR_BASE64_M3U_URL>
+hoặc
+https://vaxplugin.alokillgtv.workers.dev/tv/index.html?url=<ENCODED_OR_BASE64_M3U_URL>
 ```
 
-App đã tích hợp sẵn một trang HTML5 Player cực đẹp (dựa trên Hls.js mới nhất), tự động truyền các header bảo mật và phát video toàn màn hình mượt mà.
+App đã tích hợp sẵn giao diện Web Player IPTV vào bộ nhớ máy (0ms latency, không lo lỗi 401 Unauthorized từ worker):
+- Tham số `?url=`: Hỗ trợ cả link M3U trực tiếp hoặc chuỗi Base64 của link M3U (VD: `aHR0cHM6Ly9...`).
+- 💡 **Lưu ý quan trọng**: Do đây là trình phát Web tương tác (người dùng bấm chọn kênh trực tiếp trên giao diện Web), trong `parseDetailResponse()` hãy trả về `"isEmbed": true` (hoặc đặt `"playerType": "embed"` trong Manifest, hoặc thêm header `"Block-Sniffer": "true"`) để App giữ nguyên giao diện Web Player cho người dùng thao tác.
+
+```javascript
+return JSON.stringify({
+    url: "https://vax.local/tv/index.html?url=" + BASE64.encode("https://domain.com/list.m3u"),
+    isEmbed: true
+});
+```
 
 ---
 
@@ -2697,13 +2708,26 @@ Video chạy mượt 100%, tua (seek) tức thì mà không tốn công rewrite 
 
 ---
 
-### ✅ Trường hợp 2: Khi phát bằng WebView (Embed / Hls.js)
+### ✅ Trường hợp 2: Khi phát bằng WebView (Embed / Hls.js / Web Player IPTV)
 
 Do cơ chế bảo mật Same-Origin Policy của trình duyệt web (WebView), các thẻ `<video>` hoặc thư viện Hls.js chạy trong môi trường web không cho phép tùy biến header `Referer` cho từng request `.ts`.
 
-Lúc này, bạn có thể:
-1. **Sử dụng Web Player IPTV nội bộ**: Trả về link dạng `https://vax.local/tv?url=...&referer=...`.
-2. Hoặc nếu tự viết trang HTML player riêng, bạn có thể bọc URL qua `https://vax.local/fetch?url=...` để Native App tự động inject Header vào từng phân đoạn.
+Trước đây, dev phải dùng Cloudflare Worker để đọc file M3U8, parse từng dòng và viết lại (rewrite) link `.ts` trỏ về worker.
+
+🎉 **Hiện tại, Virtual Proxy nội bộ `vax.local` của VAAPP đã TỰ ĐỘNG REWRITE M3U8 Y HỆT CLOUDFLARE WORKER:**
+1. Khi bạn truyền link phát qua proxy:  
+   `https://vax.local/fetch?url=<ENCODED_M3U8_URL>&referer=<ENCODED_REFERER>&ua=<ENCODED_UA>`
+2. Virtual Proxy nội bộ của App sẽ:
+   - Tự động nhận diện nội dung trả về là Playlist M3U8 (`.m3u8`, MIME type HLS hoặc header `#EXTM3U`).
+   - Tự động giải quyết (resolve) tất cả các đường dẫn tương đối (relative paths) thành đường dẫn tuyệt đối chuẩn xác theo domain gốc của server CDN.
+   - **Tự động Rewrite (viết lại) từng dòng phân đoạn video (`.ts`, `.m4s`, `.aac`), sub-playlist chất lượng (`720p.m3u8`), và cả thẻ khóa giải mã DRM (`#EXT-X-KEY:URI="..."`, `#EXT-X-MAP:URI="..."`)** trỏ ngược về `https://vax.local/fetch?url=...&referer=...`.
+   - Gắn đầy đủ các CORS Headers (`Access-Control-Allow-Origin: *`) để trình duyệt Hls.js nhận diện luồng mượt mà.
+3. Nhờ đó:
+   - **Trình duyệt WebView / Hls.js tải từng segment con `.ts` đều đi qua proxy nội bộ và có đầy đủ header Referer / Origin / User-Agent** mà server CDN yêu cầu.
+   - Hoàn toàn triệt tiêu lỗi **403 Forbidden** và lỗi **404 Not Found** do sai đường dẫn tương đối!
+   - Tốc độ xử lý ngay trong bộ nhớ RAM của thiết bị (0ms network latency tới proxy ngoài), không tốn quota Cloudflare Worker.
+
+*(Tùy chọn: Nếu plugin của bạn muốn lấy nguyên bản file M3U8 gốc không qua rewrite, chỉ cần thêm param `&rewrite=false` hoặc `&raw=true` vào URL).*
 
 ---
 
