@@ -5,8 +5,8 @@
             "id": "ophim",
             "name": "OPhim",
             "version": "1.0.4",
-            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/ophim_plugin.js",
-            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/ophim.ico"
+            "scriptUrl": "https://raw.githubusercontent.com/youngbi/repo/main/ophim_plugin.js",
+            "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/ophim.ico"
         }
     ]
 }
